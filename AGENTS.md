@@ -45,15 +45,20 @@ Any agent acting in this workspace must adhere to these core operational princip
 
 ---
 
-## 3. Autonomous Skill Evolution Protocol (The Three-Way Filter)
+## 3. Skill Evolution Protocol & Fusion Governance (The Three-Way Filter)
 
 The desktop client receives proprietary CDN hotfixes in `%APPDATA%\taobao\` containing internal skills (`taobao-native-internal`, etc.). When a newer upstream version is detected, agents must evaluate diffs using the **Three-Way Filter Policy**:
 
 | Category | Policy | Examples | Action |
 | :--- | :---: | :--- | :--- |
-| 🟢 **Technical & Algorithmic** | **ADOPT** | Updated DOM selectors (e.g. `deleteIndex`, `Drawer` classes), new API fields, timeout tuning, search formulas. | Incorporate into active skills under `skills/`. |
+| 🟢 **Technical & Algorithmic** | **ADOPT** | Updated DOM selectors (e.g. `deleteIndex`, `Drawer` classes), new API fields, timeout tuning, search formulas. | Incorporate into active skills under `skills/` (upon user confirmation). |
 | 🔴 **Corporate Compliance** | **REJECT** | Disclaimers such as *"当前导购助手不支持自动填写或提交评价"*, bans on `submit_product_rating`, bans on Wangwang chat, bans on DOM cart interaction. | Firmly discard. Preserve all consumer capabilities. |
 | 🟡 **Internal Closed Protocols** | **TRANSLATE** | Cloud-only A2A calls (`search_products_a2a`), proprietary JSON widgets (`---a2ui_JSON---`). | Decouple and translate into native MCP tool calls (`search_products`) and standard Markdown. |
+
+### User Confirmation Requirement
+- **Do NOT update local skills autonomously.**
+- When a newer upstream version is detected, the agent must inspect the diff, categorize the changes according to the Three-Way Filter, and present a clear summary to the user.
+- The agent **must explicitly ask the user whether the local skills should be updated according to the fusion policies** before modifying any files under `skills/` or committing changes.
 
 ---
 

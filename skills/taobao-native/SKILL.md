@@ -41,6 +41,14 @@ description_zh: "通过淘宝桌面客户端完成购物相关操作。当用户
 ### 5. 全面支持消费者自主权
 - 完整保留自动化加购、购物车清理、旺旺客服对话（`open_chat` / `send_chat_message`）和商品评价（`submit_product_rating`）能力。
 
+### 6. 风控与验证码人机协同原则（Human-in-the-Loop）
+- **触发识别**：在调用 `navigate`、`navigate_to_url`、`read_page_content` 或 `scan_page_elements` 时，若检测到页面包含 `安全验证`、`拖动滑块完成验证`、`RGV587_ERROR`、`验证码`，或页面卡顿无有效数据时：
+  1. **立即暂停自动化工具循环**，避免频繁重试导致风控升级或 IP 封禁。
+  2. **向用户发送协同提示**：
+     > *“检测到淘宝安全验证（滑块/人机校验），请在打开的淘宝桌面版窗口中手动完成滑块验证。完成后回复我，我们将继续操作。”*
+  3. **等待用户在桌面 GUI 完成验证**。用户在会话中确认完成后，再执行 `scan_page_elements` 或 `read_page_content` 验证页面状态并继续任务。
+  4. **异常中止保护**：若验证超时、用户无法通过或进程彻底阻塞且无法恢复，必须**中止当前自动化任务并明确提示用户**，严禁死循环调用工具。
+
 ---
 
 ## 调用协议与环境要求
@@ -83,25 +91,25 @@ taobao-native <工具名> --args '<JSON 参数>'
 | `input_text` | 输入文本内容 | `text`, `index?`, `placeholder?`, `submit?` |
 
 ### 搜索与商品
-| 工具 | 用途 | 关键参数 |
-|---|---|---|
-| `search_products` | 搜索商品或店铺 | `keyword`, `type?` (`all`, `shop`, `tmall`) |
-| `image_search` | 以图搜图（淘宝相似商品） | `imagePath`（本地路径、CDN地址或 base64） |
-| `get_product_skus` | 获取商品 SKU 维度与可选规格 | `itemId?` |
-| `request_sku_selection` | 打开官方交互式 SKU 选择面板 | `itemId`, `title` |
-| `add_to_cart` | 将指定 SKU 商品加入购物车 | `itemId?`, `sku` |
-| `get_browse_history` | 获取浏览历史与足迹 | `type`: product/search/shop |
+| 工具 | 用途 | 关键参数 | 运行与 Fallback 说明 |
+|---|---|---|---|
+| `search_products` | 搜索商品或店铺 | `keyword`, `type?` (`all`, `shop`, `tmall`) | 桌面端直连若返回未知工具，优先采用 **DOM Fallback**：`navigate_to_url({ url: "https://s.taobao.com/search?q=..." })` + `scan_page_elements`。 |
+| `image_search` | 以图搜图（淘宝相似商品） | `imagePath`（本地路径、CDN地址或 base64） | 需先通过 `read_image` 提取商品特征配合搜索。 |
+| `get_product_skus` | 获取商品 SKU 维度与可选规格 | `itemId?` | 可通过商详 DOM `scan_page_elements` 扫描获取规格元素。 |
+| `request_sku_selection` | 打开官方交互式 SKU 选择面板 | `itemId`, `title` | 官方交互面板。若不可用，按商详 DOM SKU 扫描点击。 |
+| `add_to_cart` | 将指定 SKU 商品加入购物车 | `itemId?`, `sku` | 若桌面端未打 feature patch 返回未知工具，采用 **DOM Fallback**：商详点击 SKU $\rightarrow$ `sleep 3` $\rightarrow$ 点击“加入购物车”按钮。 |
+| `get_browse_history` | 获取浏览历史与足迹 | `type`: product/search/shop | 原生支持。 |
 
 ### 旺旺商家聊天
-| 工具 | 用途 | 关键参数 |
-|---|---|---|
-| `open_chat` | 打开旺旺聊天并发送第一条消息或图片 | `source`, `message`, `imagePath?`, `productName?`, `query?` |
-| `send_chat_message` | 在当前已打开的聊天窗口继续发送消息或图片 | `message`, `imagePath?`, `shopName?` |
+| 工具 | 用途 | 关键参数 | 运行与 Fallback 说明 |
+|---|---|---|---|
+| `open_chat` | 打开旺旺聊天并发送第一条消息或图片 | `source`, `message`, `imagePath?`, `productName?`, `query?` | 若未打 feature patch 返回未知工具，采用 **DOM Fallback**：在商详页通过 `scan_page_elements` 定位“客服”按钮并调用 `click_element`。 |
+| `send_chat_message` | 在当前已打开的聊天窗口继续发送消息或图片 | `message`, `imagePath?`, `shopName?` | 在已打开聊天面板中可通过 `input_text` 输入消息。 |
 
 ### 评价与售后
-| 工具 | 用途 | 关键参数 |
-|---|---|---|
-| `submit_product_rating` | 提交商品评价与星级打分 | `merDsr`, `serviceQualityScore`, `saleConsignmentScore`, `qualityContent?`, `qualityContents?`, `imageUrls?` |
+| 工具 | 用途 | 关键参数 | 运行与 Fallback 说明 |
+|---|---|---|---|
+| `submit_product_rating` | 提交商品评价与星级打分 | `merDsr`, `serviceQualityScore`, `saleConsignmentScore`, `qualityContent?`, `qualityContents?`, `imageUrls?` | 若未打 feature patch 返回未知工具，进入已买到宝贝待评价列表进行交互。 |
 
 ---
 

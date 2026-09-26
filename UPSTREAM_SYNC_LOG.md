@@ -28,3 +28,51 @@
 ### 3. 🟡 TRANSLATED (Internal Protocols Decoupled)
 - **A2A / Closed Cloud Protocols**: Decoupled cloud-only `search_products_a2a` and internal JSON structures into standard MCP tool calls and clean Markdown output.
 - **A2UI Payment Messages**: Translated internal message payloads into standard Alipay cashier handling.
+
+---
+
+## [2026-09-26] Skill Import: `product-search-pipeline` (v1.1.4)
+
+- **Skill**: `product-search-pipeline`
+- **Governance**: Fused according to the **Three-Way Filter Policy**.
+- **🟢 ADOPTED**:
+  - Structured slot extraction pipeline (品类、预算、品牌、使用场景等).
+  - Search parameter mapping rules (keyword max 4 tokens, sort mapping, budget-to-price-range formulas).
+  - Multi-category budget allocation ratios (⭐⭐⭐ 40-60%, ⭐⭐ 30-40%).
+- **🔴 REJECTED**:
+  - Compliance disclaimers limiting automated cart additions and direct checkout.
+- **🟡 TRANSLATED**:
+  - Decoupled internal search service calls into standard URL search automation (`navigate_to_url` + `https://s.taobao.com/search?q=...`) and DOM candidate parsing.
+
+---
+
+## [2026-09-26] Skill Import: `shopping-recommendation` (v1.0.8)
+
+- **Skill**: `shopping-recommendation`
+- **Governance**: Fused according to the **Three-Way Filter Policy**.
+- **🟢 ADOPTED**:
+  - Core recommendation principle: "先推荐后澄清" (Entity delivery first before asking clarifying questions).
+  - 4-step candidate filtering pipeline: Semantic relevance $\rightarrow$ Hard attribute constraints $\rightarrow$ Price boundary (+20% drop, +10-20% note) $\rightarrow$ Brand deduplication.
+  - 3-tier starter framework: 必备 (Core) / 建议 (Nice-to-have) / 不用买 (Avoid trap).
+  - Standardized Markdown recommendation card presentation with `_.webp` removal.
+- **🔴 REJECTED**:
+  - Corporate restrictions banning automated ratings and Wangwang customer service interactions.
+- **🟡 TRANSLATED**:
+  - Translated proprietary JSON widget schemas (`---a2ui_JSON---`) into clean Markdown cards and interactive guide questions.
+
+---
+
+## [2026-09-26] Skill Import: `procurement-assistant` (v1.0.62)
+
+- **Skill**: `procurement-assistant` (Upstream: `procurement-assistant`)
+- **Governance**: Fused according to the **Three-Way Filter Policy**.
+- **🟢 ADOPTED**:
+  - Batch procurement ingestion from Excel, CSV, and tabular text.
+  - Two-step confirmation table output before initiating heavy searches.
+  - Strict serial execution of searches to prevent rate-limiting or GUI freezing.
+  - Budget-to-range mapping for procurement quotas.
+  - Seamless panel previewing via `open_page_panel({ page: "cart" })`.
+- **🔴 REJECTED**:
+  - Bans on automated batch carting and checkout workflows.
+- **🟡 TRANSLATED**:
+  - Replaced internal RPC procurement services (`search_products_service`) with desktop MCP tool navigation and DOM element extraction.

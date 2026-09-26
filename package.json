@@ -7,6 +7,8 @@
     "start": "node taobao-mcp-bridge.js",
     "diff": "node scripts/check-diff.js",
     "patch": "node scripts/patch-asar.js --patch",
+    "patch:features": "node scripts/patch-asar.js --patch-features",
+    "patch:all": "node scripts/patch-asar.js --patch-all",
     "restore": "node scripts/patch-asar.js --restore",
     "patch:status": "node scripts/patch-asar.js --status"
   },

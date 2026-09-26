@@ -44,17 +44,36 @@ function findExecutable() {
   return null;
 }
 
+const SOCKET_TIMEOUT_MS = 30000;
+const PING_TIMEOUT_MS = 2000;
+
 /**
  * Ping or connect to the named pipe.
  */
-function testPipeConnection() {
+function testPipeConnection(timeoutMs = PING_TIMEOUT_MS) {
   return new Promise((resolve) => {
+    let settled = false;
     const client = net.connect(PIPE_PATH, () => {
-      client.destroy();
-      resolve(true);
+      if (!settled) {
+        settled = true;
+        client.destroy();
+        resolve(true);
+      }
+    });
+    client.setTimeout(timeoutMs);
+    client.on('timeout', () => {
+      if (!settled) {
+        settled = true;
+        client.destroy();
+        resolve(false);
+      }
     });
     client.on('error', () => {
-      resolve(false);
+      if (!settled) {
+        settled = true;
+        client.destroy();
+        resolve(false);
+      }
     });
   });
 }
@@ -109,11 +128,23 @@ async function ensureAppRunning() {
 /**
  * Send request payload to Taobao's named pipe.
  */
-function callPipe(payload) {
+function callPipe(payload, timeoutMs = SOCKET_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
+    let settled = false;
     const client = net.connect(PIPE_PATH, () => {
       client.write(JSON.stringify(payload) + '\n');
     });
+
+    if (timeoutMs > 0) {
+      client.setTimeout(timeoutMs);
+      client.on('timeout', () => {
+        if (!settled) {
+          settled = true;
+          client.destroy();
+          reject(new Error(`Pipe request timed out after ${timeoutMs}ms for tool: ${payload?.tool || 'unknown'}`));
+        }
+      });
+    }
 
     let buffer = '';
     client.on('data', (chunk) => {
@@ -121,15 +152,23 @@ function callPipe(payload) {
     });
 
     client.on('end', () => {
-      try {
-        const parsed = JSON.parse(buffer.trim());
-        resolve(parsed);
-      } catch (err) {
-        reject(new Error(`Failed to parse pipe response: ${buffer.slice(0, 100)}`));
+      if (!settled) {
+        settled = true;
+        try {
+          const parsed = JSON.parse(buffer.trim());
+          resolve(parsed);
+        } catch (err) {
+          reject(new Error(`Failed to parse pipe response: ${buffer.slice(0, 100)}`));
+        }
       }
     });
 
-    client.on('error', reject);
+    client.on('error', (err) => {
+      if (!settled) {
+        settled = true;
+        reject(err);
+      }
+    });
   });
 }
 

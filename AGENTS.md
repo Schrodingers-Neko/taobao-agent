@@ -47,6 +47,12 @@ Any agent acting in this workspace must adhere to these core operational princip
 4. **Image URL Handling**:
    - Taobao image URLs often end with `_.webp`. Strip this suffix when embedding images in Markdown or presenting to the user.
 
+5. **CAPTCHA & Human-in-the-Loop Protocol**:
+   - If page content or DOM scan detects verification challenges (`安全验证`, `拖动滑块完成验证`, `RGV587_ERROR`, `验证码`):
+     - Immediately halt automated tool loops.
+     - Prompt user: *"检测到淘宝安全验证（滑块/人机校验），请在打开的淘宝桌面版窗口中手动完成滑块验证。完成后回复我，我们将继续操作。"*
+     - Wait for user confirmation before re-scanning. If unresolvable or blocked, abort cleanly.
+
 ---
 
 ## 3. Skill Evolution Protocol & Fusion Governance (The Three-Way Filter)
@@ -66,16 +72,32 @@ The desktop client receives proprietary CDN hotfixes in `%APPDATA%\taobao\` cont
 
 ---
 
-## 4. Client Inoculation & ASAR Gatekeeper Management
+## 4. Client Inoculation & ASAR Management
 
-To prevent upstream MTOP cloud token timeouts or A/B experiment flag drops from locking the agent out with:
-`{"error": "内测期间仅开放部分用户使用，请关注后续公告"}`
+The workspace maintains a safe, zero-byte-shift binary patch utility: [`scripts/patch-asar.js`](file:///F:/projects/personal/taobao/scripts/patch-asar.js). It provides two independent in-place inoculations:
 
-The workspace maintains a safe, 13-byte in-place bypass utility: [`scripts/patch-asar.js`](file:///F:/projects/personal/taobao/scripts/patch-asar.js).
+1. **Gatekeeper Bypass (13 bytes)**: Neutralizes cloud beta whitelist lockout (`if(_0x2505bf)` $\rightarrow$ `if(!1&&false)`), preventing `{"error": "内测期间仅开放部分用户使用，请关注后续公告"}`.
+2. **Feature Unblocker (29 bytes)**: Neutralizes vendor tool suppression in `function am()` (`!om['has'](_0x32d1ec['name'])` $\rightarrow$ `!0/*-----------------------*/`), natively unlocking `add_to_cart`, `open_chat`, `send_chat_message`, `submit_product_rating`, and `keyboard` via named pipe RPC.
 
-| Command | Action |
-| :--- | :--- |
-| `npm run patch:status` | Inspect whether client `app.asar` is `ORIGINAL`, `PATCHED`, or `UNKNOWN`. |
-| `npm run patch` | Verify pre-flight backup, dynamically locate signature in `out/main/index.js`, and apply 13-byte in-place bypass (`if(_0x2505bf)` $\rightarrow$ `if(!1&&false)`). |
-| `npm run restore` | Revert `app.asar` from `app.asar.original.bak` back to official unpatched binary. |
+| Command | Scope | Action |
+| :--- | :---: | :--- |
+| `npm run patch:status` | Read-only | Inspect whether client `app.asar` patches are `ORIGINAL`, `PATCHED`, or `UNKNOWN`. |
+| `npm run patch` | 13 bytes | Apply Gatekeeper cloud whitelist lockout bypass only. |
+| `npm run patch:features` | 29 bytes | Apply Feature Unblocker only (unlocks native cart, chat, rating tools). |
+| `npm run patch:all` | Both | Apply both Gatekeeper bypass and Feature Unblocker in-place. |
+| `npm run restore` | Rollback | Revert `app.asar` from `app.asar.original.bak` back to official pristine binary. |
+
+---
+
+## 5. Hardening & Verification Status
+
+The roadmap items have been implemented and verified:
+
+- ✅ **P0: Module Guard & Exports in [`scripts/patch-asar.js`](file:///F:/projects/personal/taobao/scripts/patch-asar.js)**: Wrapped in `if (require.main === module)` and exported all utilities for programmatic inspection.
+- ✅ **P0: Socket Timeout & Resilience in [`taobao-mcp-bridge.js`](file:///F:/projects/personal/taobao/taobao-mcp-bridge.js)**: Added 30s timeout on `callPipe` and 2s on `testPipeConnection` with clean socket teardown.
+- ✅ **P1: CAPTCHA Human-in-the-Loop Protocol in [`skills/taobao-native/SKILL.md`](file:///F:/projects/personal/taobao/skills/taobao-native/SKILL.md)**: Standardized detection of `安全验证`/`RGV587_ERROR`, pause-and-notify prompt, and abort safety.
+- ✅ **P1: Tool Fallback Clarifications in Skills**: Added DOM automation fallback paths (`navigate_to_url` + `scan_page_elements` + `click_element`) in `taobao-native` and `product-search-pipeline`.
+- ✅ **P1: Upstream Sync Log in [`UPSTREAM_SYNC_LOG.md`](file:///F:/projects/personal/taobao/UPSTREAM_SYNC_LOG.md)**: Documented Three-Way Filter rationale for `product-search-pipeline`, `shopping-recommendation`, and `procurement-assistant`.
+- ✅ **P2: ASAR Feature Unblocker in [`scripts/patch-asar.js`](file:///F:/projects/personal/taobao/scripts/patch-asar.js)**: In-place 29-byte patch implemented and verified live over RPC.
+
 

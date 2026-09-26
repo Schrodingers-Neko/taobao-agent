@@ -95,18 +95,24 @@ description: "商品搜索执行链路。负责场景识别、搜索参数构造
 ---
 
 ## 4. MCP 工具调用规范
+ 
+在桌面端 MCP 环境中，由于桌面客户端底层 RPC 未单独暴露 `search_products` 服务端接口，搜索执行采用以下标准管线：
 
-在 MCP 环境中，搜索链路优先通过 Native MCP 接口执行：
+### 4.1 桌面端标准搜索调用流程 (Web Search Automation)
+1. **构造标准搜索 URL**：
+   将整理好的 `keyword`、排序与价格参数拼接入搜索 URL：
+   - 基础检索：`https://s.taobao.com/search?q=${encodeURIComponent(keyword)}`
+   - 价格过滤：附带 `&filter=reserve_price[${priceStart},${priceEnd}]`
+   - 销量排序：附带 `&sort=sale-desc`
+2. **页面导航**：
+   调用 `navigate_to_url({ url: "<构造后的搜索URL>", sourceApp: "Antigravity" })` 打开搜索结果页。
+3. **风控与滑块检测 (Human-in-the-Loop)**：
+   导航后首先执行 `read_page_content` 或 `scan_page_elements`。若检测到 `安全验证`、`拖动滑块完成验证`、`RGV587_ERROR`：
+   - **立即暂停调用**；
+   - 提示用户：*“检测到淘宝安全验证（滑块/人机校验），请在打开的淘宝桌面版窗口中手动完成滑块验证。完成后回复我，我们将继续操作。”*；
+   - 用户确认完成后，重新扫描页面元素。若阻塞无法解决，中止任务并提醒用户。
+4. **候选池解析**：
+   调用 `scan_page_elements({})` 扫描商品列表，获取候选商品名称、价格、店铺与链接，进入后续导购推荐链路。
 
-```javascript
-// Native MCP 搜索调用示例
-search_products({
-  keyword: "露营帐篷+防暴雨",
-  sort: "sales_desc",
-  priceStart: "300",
-  priceEnd: "600"
-})
-```
-
-- **Fallback 机制**：若 direct search API 不可用或返回空集合，通过 `navigate_to_url` 访问 `https://s.taobao.com/search?q=...`，结合 `scan_page_elements` 扫描候选结果。
-- **交易与加购自由度**：召回候选后，支持直接调用 `add_to_cart`、`open_page_panel` 或进入详情页比对真实 SKU 价格。
+### 4.2 交易与加购自由度
+召回候选后，支持直接调用 `open_page_panel` 预览、进入详情页精准点击 SKU 查验真实价格，并依据用户意图完成加购与下单。

@@ -95,16 +95,18 @@ async function ensureAppRunning() {
   launchingPromise = (async () => {
     const exePath = findExecutable();
     if (!exePath) {
-      log('Executable not found, trying protocol handler taodesktop://');
-      spawn('cmd.exe', ['/c', 'start', '', 'taodesktop://'], {
+      log('Executable not found, trying protocol handler taodesktop:// (minimized)');
+      spawn('cmd.exe', ['/c', 'start', '""', '/min', 'taodesktop://'], {
         detached: true,
         stdio: 'ignore',
+        windowsVerbatimArguments: true,
       }).unref();
     } else {
-      log('Launching Taobao Desktop from:', exePath);
-      spawn(exePath, [], {
+      log('Launching Taobao Desktop (windowed & minimized) from:', exePath);
+      spawn('cmd.exe', ['/c', 'start', '""', '/min', `"${exePath}"`], {
         detached: true,
         stdio: 'ignore',
+        windowsVerbatimArguments: true,
       }).unref();
     }
 

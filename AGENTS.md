@@ -53,6 +53,10 @@ Any agent acting in this workspace must adhere to these core operational princip
      - Prompt user: *"检测到淘宝安全验证（滑块/人机校验），请在打开的淘宝桌面版窗口中手动完成滑块验证。完成后回复我，我们将继续操作。"*
      - Wait for user confirmation before re-scanning. If unresolvable or blocked, abort cleanly.
 
+6. **Windowed & Minimized Lifecycle**:
+   - The desktop client must always be launched interactively via the Windows Shell (`start "" /min "<exePath>"` or `npm run client:start`) rather than as a raw headless process (`cmd /c <exePath>` or direct `child_process.spawn`).
+   - This ensures the Electron client attaches to the interactive user window station (`WinSta0`), initializes its system tray icon, and stays minimized on the taskbar so that human-in-the-loop CAPTCHAs can be solved directly on screen.
+
 ---
 
 ## 3. Skill Evolution Protocol & Fusion Governance (The Three-Way Filter)
@@ -86,6 +90,7 @@ The workspace maintains a safe, zero-byte-shift binary patch utility: [`scripts/
 | `npm run patch:features` | 29 bytes | Apply Feature Unblocker only (unlocks native cart, chat, rating tools). |
 | `npm run patch:all` | Both | Apply both Gatekeeper bypass and Feature Unblocker in-place. |
 | `npm run restore` | Rollback | Revert `app.asar` from `app.asar.original.bak` back to official pristine binary. |
+| `npm run client:start` | Lifecycle | Launch desktop client interactively (windowed & minimized) via Windows Shell. |
 
 ---
 

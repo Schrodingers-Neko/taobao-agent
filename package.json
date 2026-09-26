@@ -10,7 +10,8 @@
     "patch:features": "node scripts/patch-asar.js --patch-features",
     "patch:all": "node scripts/patch-asar.js --patch-all",
     "restore": "node scripts/patch-asar.js --restore",
-    "patch:status": "node scripts/patch-asar.js --status"
+    "patch:status": "node scripts/patch-asar.js --status",
+    "client:start": "cmd /c start \"\" /min \"%LOCALAPPDATA%\\Programs\\taobao\\淘宝桌面版.exe\""
   },
   "keywords": [
     "taobao",

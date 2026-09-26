@@ -1,0 +1,19 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Untracked backups
+backup/
+
+# Untracked agent testing instructions
+TESTING_INSTRUCTIONS.md
+
+# Temporary and log files
+*.bak
+*.tmp
+temp/
+*.log
+
+# Dependencies (if added later)
+node_modules/

@@ -12,7 +12,10 @@ F:\projects\personal\taobao\
 ├── package.json                     # [Tracked] Workspace npm scripts & metadata
 ├── taobao-mcp-bridge.js             # [Tracked] Stdio MCP Bridge connecting to \\.\pipe\taobao-cli-rpc
 ├── skills/                          # [Tracked] Active Agent Skills directory
-│   └── taobao-native/               # Core execution skill (v1.0.43 base)
+│   ├── taobao-native/               # Core execution skill (v1.0.61 base)
+│   ├── product-search-pipeline/     # Search routing & slot extraction (v1.1.4 base)
+│   ├── shopping-recommendation/     # Recommendation strategy & 4-tier filtering (v1.0.8 base)
+│   └── procurement-assistant/       # Batch procurement & spreadsheet pipeline (v1.0.62 base)
 ├── scripts/                         # [Tracked] Maintenance and testing utilities
 │   ├── check-diff.js                # Upstream skill comparison and inspection tool
 │   └── patch-asar.js                # 13-byte ASAR gatekeeper inoculation utility

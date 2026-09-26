@@ -54,29 +54,81 @@ function getSkillFiles(dir) {
   return result;
 }
 
-function compareSkill(skillName = 'taobao-native') {
-  const store = getDesktopSkillsStore();
-  if (!store || !store.buildIn) {
-    return { error: 'Could not access Taobao Desktop skills store in %APPDATA%\\taobao' };
+const os = require('os');
+
+function resolveUpstreamInfo(skillName, store) {
+  const tbHome = path.join(os.homedir(), '.taobao');
+  let userDirs = [];
+  if (fs.existsSync(tbHome)) {
+    try {
+      userDirs = fs.readdirSync(tbHome).filter((d) => {
+        try {
+          return fs.statSync(path.join(tbHome, d)).isDirectory();
+        } catch {
+          return false;
+        }
+      });
+      // Prioritize active signed-in user profiles before 'default'
+      userDirs.sort((a, b) => (a === 'default' ? 1 : b === 'default' ? -1 : 0));
+    } catch {}
   }
 
-  // Map local skill name to internal store key
-  const internalKey = skillName === 'taobao-native' ? 'taobao-native-internal' : skillName;
-  const upstreamInfo = store.buildIn[internalKey];
+  const candidateKeys = [];
+  if (skillName === 'taobao-native') {
+    candidateKeys.push('taobao-native-internal');
+  } else if (skillName === 'procurement-assistant') {
+    candidateKeys.push('procurement-assistant', 'procurement-assistant-local');
+  } else {
+    candidateKeys.push(skillName);
+  }
 
-  if (!upstreamInfo || !upstreamInfo.path) {
-    return { error: `Skill "${internalKey}" not found in Taobao Desktop builtin store` };
+  for (const k of candidateKeys) {
+    // 1. Check user dirs first
+    for (const u of userDirs) {
+      const p = path.join(tbHome, u, 'skills', 'builtin', k);
+      if (fs.existsSync(p)) {
+        const skillMd = path.join(p, 'SKILL.md');
+        const v = fs.existsSync(skillMd) ? parseFrontmatterVersion(fs.readFileSync(skillMd, 'utf8')) : null;
+        return {
+          key: k,
+          path: p,
+          version: v || (store && store.buildIn && store.buildIn[k] ? store.buildIn[k].version : 'unknown'),
+        };
+      }
+    }
+    // 2. Check store.buildIn
+    if (store && store.buildIn && store.buildIn[k] && fs.existsSync(store.buildIn[k].path)) {
+      const p = store.buildIn[k].path;
+      const skillMd = path.join(p, 'SKILL.md');
+      const v = fs.existsSync(skillMd) ? parseFrontmatterVersion(fs.readFileSync(skillMd, 'utf8')) : null;
+      return {
+        key: k,
+        path: p,
+        version: v || store.buildIn[k].version || 'unknown',
+      };
+    }
+  }
+
+  return null;
+}
+
+function compareSkill(skillName = 'taobao-native') {
+  const store = getDesktopSkillsStore();
+  const upstream = resolveUpstreamInfo(skillName, store);
+
+  if (!upstream || !upstream.path) {
+    return { error: `Skill "${skillName}" not found in Taobao Desktop builtin store or directories`, skillName };
   }
 
   const localSkillDir = path.resolve(__dirname, '..', 'skills', skillName);
-  const upstreamSkillDir = upstreamInfo.path;
+  const upstreamSkillDir = upstream.path;
 
   // Versions
   const localSkillMd = path.join(localSkillDir, 'SKILL.md');
   const localVersion = fs.existsSync(localSkillMd)
     ? parseFrontmatterVersion(fs.readFileSync(localSkillMd, 'utf8')) || 'unknown'
     : 'not_installed';
-  const upstreamVersion = upstreamInfo.version || 'unknown';
+  const upstreamVersion = upstream.version || 'unknown';
 
   // Files
   const localFiles = getSkillFiles(localSkillDir);
@@ -113,7 +165,7 @@ function compareSkill(skillName = 'taobao-native') {
 
   return {
     skillName,
-    internalName: internalKey,
+    internalName: upstream.key,
     localVersion,
     upstreamVersion,
     isUpstreamNewer: upstreamVersion !== localVersion,
@@ -124,18 +176,25 @@ function compareSkill(skillName = 'taobao-native') {
   };
 }
 
-// CLI Execution
-if (require.main === module) {
-  const result = compareSkill('taobao-native');
-  if (result.error) {
-    console.error('Error:', result.error);
-    process.exit(1);
-  }
+function getInstalledSkillNames() {
+  const skillsDir = path.resolve(__dirname, '..', 'skills');
+  if (!fs.existsSync(skillsDir)) return [];
+  return fs.readdirSync(skillsDir).filter((d) => {
+    try {
+      return fs.statSync(path.join(skillsDir, d)).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+}
 
+function printReport(result) {
+  if (result.error) {
+    console.error(`[${result.skillName || 'unknown'}] Error:`, result.error);
+    return;
+  }
   console.log('====================================================');
-  console.log('       TAOBAO-AGENT UPSTREAM SKILL DIFF REPORT      ');
-  console.log('====================================================');
-  console.log(`Target Skill     : ${result.skillName} (Internal: ${result.internalName})`);
+  console.log(`Target Skill     : ${result.skillName} (Upstream: ${result.internalName})`);
   console.log(`Local Version    : ${result.localVersion}`);
   console.log(`Upstream Version : ${result.upstreamVersion} ${result.isUpstreamNewer ? '⚡ (NEWER VERSION DETECTED)' : '✅ (UP TO DATE)'}`);
   console.log(`Local Path       : ${result.localPath}`);
@@ -144,14 +203,32 @@ if (require.main === module) {
   console.log(`Changed / Diverged Files (${result.changedFiles.length}):`);
   for (const file of result.changedFiles) {
     const info = result.files[file];
-    console.log(`  • ${file.padEnd(35)} : [${info.status}] (Local: ${info.localSize ?? '-'} bytes, Upstream: ${info.upstreamSize ?? '-'} bytes)`);
+    console.log(`  • ${file.padEnd(30)} : [${info.status}] (Local: ${info.localSize ?? '-'} bytes, Upstream: ${info.upstreamSize ?? '-'} bytes)`);
   }
-  console.log('----------------------------------------------------');
-  console.log('All File Statuses:');
-  for (const [file, info] of Object.entries(result.files)) {
-    console.log(`  [${info.status.padEnd(13)}] ${file}`);
+  if (result.changedFiles.length === 0) {
+    console.log('  All files identical.');
   }
-  console.log('====================================================');
+  console.log('====================================================\n');
 }
 
-module.exports = { compareSkill };
+// CLI Execution
+if (require.main === module) {
+  const arg = process.argv[2];
+  if (arg && arg !== '--all') {
+    const res = compareSkill(arg);
+    printReport(res);
+    if (res.error) process.exit(1);
+  } else {
+    const skills = getInstalledSkillNames();
+    console.log(`Scanning ${skills.length} installed skill(s) under skills/...`);
+    let hasError = false;
+    for (const s of skills) {
+      const res = compareSkill(s);
+      printReport(res);
+      if (res.error) hasError = true;
+    }
+    if (hasError) process.exit(1);
+  }
+}
+
+module.exports = { compareSkill, resolveUpstreamInfo, getInstalledSkillNames };

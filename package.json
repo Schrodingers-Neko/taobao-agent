@@ -1,0 +1,21 @@
+{
+  "name": "taobao-agent",
+  "version": "1.0.0",
+  "description": "Desktop MCP bridge and autonomous agent framework for Taobao Desktop client on Windows",
+  "main": "taobao-mcp-bridge.js",
+  "scripts": {
+    "start": "node taobao-mcp-bridge.js",
+    "diff": "node scripts/check-diff.js",
+    "patch": "node scripts/patch-asar.js --patch",
+    "restore": "node scripts/patch-asar.js --restore",
+    "patch:status": "node scripts/patch-asar.js --status"
+  },
+  "keywords": [
+    "taobao",
+    "mcp",
+    "agent",
+    "desktop-automation"
+  ],
+  "author": "",
+  "license": "ISC"
+}

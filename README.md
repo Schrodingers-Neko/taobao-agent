@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Protocol-MCP%202.0%20(stdio)-purple.svg" alt="MCP" />
   <img src="https://img.shields.io/badge/Runtime-Electron%20%2F%20Node.js%20%3E%3D18-green.svg" alt="Node" />
   <img src="https://img.shields.io/badge/Target-淘宝桌面版-orange.svg" alt="Taobao" />
-  <img src="https://img.shields.io/badge/License-ISC-lightgrey.svg" alt="License" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License" />
 </p>
 
 ---
@@ -191,4 +191,4 @@ npm run client:start
 
 ## 📄 开源许可证
 
-本项目基于 [ISC License](LICENSE) 开源。
+本项目基于 [MIT License](LICENSE) 开源。

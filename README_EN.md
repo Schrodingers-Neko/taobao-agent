@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Protocol-MCP%202.0%20(stdio)-purple.svg" alt="MCP" />
   <img src="https://img.shields.io/badge/Runtime-Electron%20%2F%20Node.js%20%3E%3D18-green.svg" alt="Node" />
   <img src="https://img.shields.io/badge/Target-Taobao%20Desktop-orange.svg" alt="Taobao" />
-  <img src="https://img.shields.io/badge/License-ISC-lightgrey.svg" alt="License" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License" />
 </p>
 
 ---
@@ -192,4 +192,4 @@ Audit decisions are tracked in [`UPSTREAM_SYNC_LOG.md`](file:///F:/projects/pers
 
 ## 📄 License
 
-This project is licensed under the [ISC License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).

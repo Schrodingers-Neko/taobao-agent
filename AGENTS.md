@@ -19,8 +19,7 @@ F:\projects\personal\taobao\
 ├── scripts/                         # [Tracked] Maintenance and testing utilities
 │   ├── check-diff.js                # Upstream skill comparison and inspection tool
 │   └── patch-asar.js                # 13-byte ASAR gatekeeper inoculation utility
-├── backup/                          # [Untracked / Ignored] Preserved snapshots
-└── TESTING_INSTRUCTIONS.md          # [Untracked / Ignored] Detailed local testing runbooks
+└── backup/                          # [Untracked / Ignored] Preserved snapshots
 ```
 
 - **Runtime Target**: Windows Taobao Desktop (`淘宝桌面版.exe`).
@@ -79,15 +78,4 @@ The workspace maintains a safe, 13-byte in-place bypass utility: [`scripts/patch
 | `npm run patch:status` | Inspect whether client `app.asar` is `ORIGINAL`, `PATCHED`, or `UNKNOWN`. |
 | `npm run patch` | Verify pre-flight backup, dynamically locate signature in `out/main/index.js`, and apply 13-byte in-place bypass (`if(_0x2505bf)` $\rightarrow$ `if(!1&&false)`). |
 | `npm run restore` | Revert `app.asar` from `app.asar.original.bak` back to official unpatched binary. |
-
----
-
-## 5. Local Testing Runbooks for Agents
-
-Detailed, step-by-step testing runbooks are maintained in the local (untracked) file:
-👉 [`TESTING_INSTRUCTIONS.md`](file:///F:/projects/personal/taobao/TESTING_INSTRUCTIONS.md)
-
-Refer to `TESTING_INSTRUCTIONS.md` for:
-- **Runbook A: Skill Fusion Testing Procedure**: How to inspect upstream diffs, apply the Three-Way Policy, and document upgrades.
-- **Runbook B: End-to-End Live Verification Procedure**: How to safely test MCP connectivity, tab discovery, cart inspection, and tear-down against the live desktop client.
 

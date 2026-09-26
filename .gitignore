@@ -6,9 +6,6 @@ ehthumbs.db
 # Untracked backups
 backup/
 
-# Untracked agent testing instructions
-TESTING_INSTRUCTIONS.md
-
 # Temporary and log files
 *.bak
 *.tmp

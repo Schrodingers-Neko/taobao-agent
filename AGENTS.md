@@ -18,7 +18,13 @@ F:\projects\personal\taobao\
 │   └── procurement-assistant/       # Batch procurement & spreadsheet pipeline (v1.0.62 base)
 ├── scripts/                         # [Tracked] Maintenance and testing utilities
 │   ├── check-diff.js                # Upstream skill comparison and inspection tool
-│   └── patch-asar.js                # 13-byte ASAR gatekeeper inoculation utility
+│   ├── patch-asar.js                # Zero-byte-shift ASAR gatekeeper & capability unblocker
+│   ├── declutter.js                 # Transactional UI decluttering & patch composition
+│   ├── declutter-patches.js         # Pure patch transform functions and rules
+│   ├── client-stop.js               # Controlled desktop client & child process termination
+│   ├── test-captcha.js              # Anti-stacking CAPTCHA guard offline test suite
+│   ├── test-declutter.js            # UI declutter 16-combination and migration tests
+│   └── captcha/                     # CAPTCHA guard main/renderer coordinator subsystem
 └── backup/                          # [Untracked / Ignored] Preserved snapshots
 ```
 

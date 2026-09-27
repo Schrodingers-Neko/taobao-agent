@@ -18,6 +18,8 @@
     "captcha:apply": "node scripts/declutter.js --apply captcha-guard",
     "captcha:restore": "node scripts/declutter.js --restore captcha-guard",
     "test:captcha": "node scripts/test-captcha.js",
+    "test:declutter": "node scripts/test-declutter.js",
+    "test": "npm run test:captcha && npm run test:declutter",
     "client:stop": "node scripts/client-stop.js",
     "client:start": "cmd /c start \"\" /min \"%LOCALAPPDATA%\\Programs\\taobao\\淘宝桌面版.exe\""
   },

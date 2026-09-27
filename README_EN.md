@@ -1,5 +1,34 @@
 # Taobao Agent (Desktop MCP Assistant)
 
+## Anti-Stacking CAPTCHA Guard (captcha-guard)
+
+`captcha-guard` is an independent, opt-in patch (disabled by default). It rebuilds the main process and both preloads from the immutable ASAR baseline, unifying verification states across ordinary MTop and streaming requests. When a challenge occurs, only a single verification iframe is presented; during verification, automated actions and background MTop requests are paused, immediately returning `CAPTCHA_REQUIRED` without queuing or replaying. The verification iframe's own network access remains operational.
+
+```powershell
+npm run test:captcha                 # Offline fixture, real source anchor, and syntax validation
+npm run test:captcha -- --install    # Disposable client clone: install, independent restore, UI composition, and rollback
+npm run captcha:status              # Read-only check for patch registry, installed hashes, and backups
+npm run captcha:apply               # Enable CAPTCHA guard only; previously closed clients remain closed
+npm run captcha:restore             # Restore CAPTCHA guard only, preserving other patches
+npm run client:stop                 # Terminate the client and its child processes after use
+```
+
+Preflight checks verify unique transformation anchors, JavaScript syntax, ASAR contents and integrity, existing gatekeeper/feature signatures, as well as CSS and unpacked sidecar hashes. Overwrites are refused if source incompatibility or external drift is detected. The registry is upgraded to v5 while preserving the original v4 registry; `declutter:apply all` / `declutter:restore all` continue to operate strictly on the four UI groups. Subsequent UI operations recompose the CAPTCHA guard from the identical baseline.
+
+Installation and restoration share a transactional journal. If a write fails, the original ASAR, CSS, and registry are completely restored; if a process is interrupted midway, running the command again will automatically recover the uncommitted transaction first. Backups reside in `%APPDATA%\taobao\taobao-agent-declutter-backup`; do not delete or manually edit the baseline, hashes, or `manifest.json`. If a `DRIFTED` state is reported, preserve the environment and inspect for client updates or external patches rather than forcing an overwrite.
+
+Running clients undergo a controlled relaunch, minimized in the interactive desktop via the Windows Shell; clients that were closed prior to running the command remain closed. Do not leave unused clients running in the background. The patch does not purge caches, alter downloaded CDN files, or modify `skills/`. Existing feature unblockers, UI patches, and declutter observers are preserved intact.
+
+MCP tool discovery (`tools/list`) and local verification controls do not auto-launch the client, avoiding phantom background processes upon MCP connection alone. When the client is closed, tool discovery reports a connection error; launch the client explicitly using `npm run client:start`, then refresh MCP tools. When bridge files are updated, existing MCP client sessions must reconnect to reload new bridge logic.
+
+Once the user manually solves the slider, the state transitions to `verified_awaiting_confirmation`. The agent MUST NOT resume page automation until the user explicitly confirms completion in chat. `get_verification_status()` performs local read-only status and counter inspections; `resume_after_verification({ challengeId })` is only invoked upon explicit user confirmation, rejecting incomplete or expired challenge IDs. Closing the verification window maintains the pause state; users can click "Reopen verification" to resume manual solving. Verification parameters reside strictly in-memory, bound to the original account, API, version, and serialized request payload, and upon resume are consumed only by a single newly initiated matching request.
+
+Local page tools retain login checks while bypassing `ABExperimentQuery`; cloud tools retain their original workflows. Identical login states and accounts do not repeatedly trigger credential pre-warming. An unready MTop page returns `MTOP_NOT_READY` instead of triggering three pseudo network retries. If network credential refreshes fail, a 60-second cooldown is enforced with no timed retry loops; the cooldown resets only upon account change or a trusted page reaching readiness.
+
+The test fixture `scripts/captcha/fixtures/mtop-2.4.16.txt` is sourced from the locally cached SDK and executes strictly within an isolated mock DOM/transport sandbox. Tests make no RPC calls to Taobao or external networks. Following installation, the user must first manually complete verification and confirm, followed by brief read-only operations and a 10-minute CPU, memory, and lifecycle sampling run; if verification triggers again, execution immediately pauses.
+
+After user confirmation and local coordinator return to `idle`, you can run `node scripts/captcha/profile.js --manual-confirmed`. Profiling runs for 10 minutes by default, recording process CPU, working set, private bytes, and local lifecycle counters every 5 seconds to `backup/captcha-investigation/profile-*.jsonl`; process shifts or unreadable CPU values are never masked with zero values. Profiling stops immediately if verification reappears or the client exits, and never auto-launches, auto-confirms, or calls page tools. Run `npm run client:stop` when finished.
+
 <p align="center">
   <strong>English</strong> | <a href="README.md">简体中文</a>
 </p>
@@ -97,9 +126,15 @@ taobao-agent/
 │   ├── product-search-pipeline/     # Search routing & slot extraction (v1.1.4 base)
 │   ├── shopping-recommendation/     # Recommendation strategy & 4-tier filtering (v1.0.8 base)
 │   └── procurement-assistant/       # Batch procurement & spreadsheet parsing (v1.0.62 base)
-└── scripts/                         # Maintenance and patching utilities
+└── scripts/                         # Maintenance and testing utilities
     ├── check-diff.js                # Upstream skill comparison tool
-    └── patch-asar.js                # Zero-byte-shift ASAR patch & feature unblocker
+    ├── patch-asar.js                # Zero-byte-shift ASAR gatekeeper & capability unblocker
+    ├── declutter.js                 # Transactional UI decluttering & patch composition
+    ├── declutter-patches.js         # Pure patch transform functions and rules
+    ├── client-stop.js               # Controlled desktop client & child process termination
+    ├── test-captcha.js              # Anti-stacking CAPTCHA guard offline test suite
+    ├── test-declutter.js            # UI declutter 16-combination and migration tests
+    └── captcha/                     # CAPTCHA guard main/renderer coordinator subsystem
 ```
 
 ---
@@ -169,6 +204,13 @@ Add the bridge to your MCP client configuration (e.g. Claude Desktop, Antigravit
 | `npm run declutter:apply -- <patch-id>` | Apply UI cleanup | Apply one group, preserving the other groups; relaunch minimized |
 | `npm run declutter:status` | Read-only | Check each group, backups, installed hashes, and recovery state |
 | `npm run declutter:restore -- <patch-id>` | Rollback | Restore one group, preserving the other groups; relaunch minimized |
+| `npm run captcha:status` | Read-only | Check patch registry, installed hashes, and CAPTCHA guard status |
+| `npm run captcha:apply` | Standalone patch| Enable anti-stacking CAPTCHA guard only (single-dialog pause) |
+| `npm run captcha:restore` | Rollback | Restore CAPTCHA guard only, preserving other patches |
+| `npm run test` | Full test suite | Run all offline CAPTCHA guard tests and UI declutter tests |
+| `npm run test:captcha` | Automated test | Run anti-stacking CAPTCHA guard AST transforms & state machine tests |
+| `npm run test:declutter` | Automated test | Run UI declutter 16-combination transitions & rollback tests |
+| `npm run client:stop` | Lifecycle | Controlled shutdown of Taobao Desktop client and all child processes |
 
 Patch IDs are `home-widgets` (淘江湖, 淘宝直播, 淘金币), `search-promotions` (search hot words and promo logo), `main-menu` (帮我挑, 逛一逛, 采购宝), and `toolbar` (weather, desktop panda, screenshot button). Use `all` explicitly to apply or restore all four. Apply/restore requires a target. Optional lower sidebar entries are managed through “全部”; the previous six-entry CSS patch is retired during migration. 88VIP, logistics, cart, recommendation-feed settings, and native navigation APIs are preserved.
 

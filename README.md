@@ -127,7 +127,13 @@ taobao-agent/
 │   └── procurement-assistant/       # 批量采购与表格解析 (v1.0.62 基线)
 └── scripts/                         # 维护与测试工具
     ├── check-diff.js                # 上游技能对比与审计工具
-    └── patch-asar.js                # 零偏移 ASAR 补丁与能力解锁工具
+    ├── patch-asar.js                # 零偏移 ASAR 门禁与能力解锁补丁工具
+    ├── declutter.js                 # 事务化界面精简与补丁组合管理
+    ├── declutter-patches.js         # 纯函数补丁规则与 AST/CSS 转换
+    ├── client-stop.js               # 受控关闭桌面端及其子进程
+    ├── test-captcha.js              # 验证码叠加防护全量离线测试套件
+    ├── test-declutter.js            # 界面精简 16 种组合与回滚迁移测试
+    └── captcha/                     # 验证码防护主/渲染进程协调与诊断子系统
 ```
 
 ---
@@ -197,6 +203,13 @@ npm run client:start
 | `npm run declutter:apply -- <patch-id>` | 应用界面精简 | 应用指定分组，保留其他分组，并最小化重启客户端 |
 | `npm run declutter:status` | 只读检查 | 检查各分组、备份、已安装文件哈希与恢复状态 |
 | `npm run declutter:restore -- <patch-id>` | 安全回滚 | 恢复指定分组，保留其他分组，并最小化重启客户端 |
+| `npm run captcha:status` | 只读检查 | 检查补丁注册表、安装哈希及验证码防护状态 |
+| `npm run captcha:apply` | 独立补丁 | 仅启用验证码防护（单弹窗拦截与无重放防护） |
+| `npm run captcha:restore` | 安全回滚 | 仅恢复验证码防护，保留其他补丁与基线设置 |
+| `npm run test` | 综合测试 | 依次执行全量离线验证码测试与界面精简测试 |
+| `npm run test:captcha` | 自动化测试 | 运行验证码叠加防护离线 AST 转换与状态机测试 |
+| `npm run test:declutter` | 自动化测试 | 运行界面精简 16 种组合切换与事务回滚测试 |
+| `npm run client:stop` | 生命周期 | 安全受控关闭淘宝桌面端及其全部子进程 |
 
 补丁分为 `home-widgets`（淘江湖、淘宝直播、淘金币）、`search-promotions`（搜索热词与促销标识）、`main-menu`（帮我挑、逛一逛、采购宝）和 `toolbar`（天气、桌面熊猫、截图按钮）。使用 `all` 可明确应用或恢复全部四个分组；应用和恢复必须指定目标。下方可选入口通过“全部”菜单管理，迁移时移除此前六个入口的 CSS 隐藏补丁。保留 88VIP、物流、购物车、推荐流设置和原生导航接口。
 

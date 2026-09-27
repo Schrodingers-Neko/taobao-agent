@@ -31,7 +31,7 @@
 3. `scan_page_elements({})`：扫描页面元素。购物车页面会返回 `cartItems` 结构化数据，包含每个商品的 `{ title, specs, price, deleteIndex }`。
 4. 从 `cartItems` 中根据商品标题/规格找到目标商品，提取其 `deleteIndex`。
 5. `click_element({ index: <deleteIndex> })`：点击该商品的删除按钮。
-6. `click_element({ text: "删除" })`：在确认弹窗中点击确认删除。
+6. 弹窗确认删除：再次调用 `scan_page_elements({})` 获取确认弹窗中“删除”按钮的精确 `index`，调用 `click_element({ index: <confirmIndex> })` 确认删除（仅在简单二选一无歧义的原生弹窗中，允许以 `click_element({ text: "删除" })` 作为兜底）。
 
 ### 多商品批量删除 · 工具调用链路
 1. 按商品逐个执行“单商品删除”流程。

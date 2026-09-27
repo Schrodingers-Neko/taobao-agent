@@ -16,6 +16,7 @@ description_zh: "通过淘宝桌面客户端完成购物相关操作。当用户
 | 关键字 | 对应文件 | 包含内容 |
 |---|---|---|
 | 查看购物车 / 加购 / 购物车删除 | `references/cart.md` | 购物车加购、`request_sku_selection` 面板与 `deleteIndex` 结构化删除 |
+| 订单查询 / 包裹追踪 / 物流 / 运单号 | `references/orders.md` | 按订单号查询物流、提取快递运单号及订单物流状态 |
 | 评价查看 / 评论总结 / 提交评价 | `references/review.md` | `[class*=Drawer]` 抽屉评价读取与 `submit_product_rating` 评价提交 |
 | 商品详情 / 商详 / 主图 / 商品链接 / 客服 | `references/product_details.md` | 商详图片提取、下单流程与旺旺客服沟通 |
 | 客户端安装 / 下载 / 命令未找到 | `references/install-download.md` | 客户端安装包下载、配置与恢复 runbook |

@@ -11,6 +11,9 @@
     "patch:all": "node scripts/patch-asar.js --patch-all",
     "restore": "node scripts/patch-asar.js --restore",
     "patch:status": "node scripts/patch-asar.js --status",
+    "declutter:apply": "node scripts/declutter.js --apply",
+    "declutter:status": "node scripts/declutter.js --status",
+    "declutter:restore": "node scripts/declutter.js --restore",
     "client:start": "cmd /c start \"\" /min \"%LOCALAPPDATA%\\Programs\\taobao\\淘宝桌面版.exe\""
   },
   "keywords": [
@@ -20,5 +23,8 @@
     "desktop-automation"
   ],
   "author": "Schrodingers-Neko",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@electron/asar": "^3.4.1"
+  }
 }

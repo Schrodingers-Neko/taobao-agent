@@ -115,6 +115,7 @@ taobao-agent/
 ```bash
 git clone https://github.com/Schrodingers-Neko/taobao-agent.git
 cd taobao-agent
+npm install
 ```
 
 ### 2. Inspect and Apply Binary Patches
@@ -165,6 +166,19 @@ Add the bridge to your MCP client configuration (e.g. Claude Desktop, Antigravit
 | `npm run restore` | Rollback | Revert `app.asar` from backup back to official pristine binary |
 | `npm run client:start` | Lifecycle | Launch desktop client interactively (windowed & minimized) via Windows Shell |
 | `npm run diff` | Audit | Compare local skills with upstream CDN hotfixes in `%APPDATA%\taobao\` |
+| `npm run declutter:apply -- <patch-id>` | Apply UI cleanup | Apply one group, preserving the other groups; relaunch minimized |
+| `npm run declutter:status` | Read-only | Check each group, backups, installed hashes, and recovery state |
+| `npm run declutter:restore -- <patch-id>` | Rollback | Restore one group, preserving the other groups; relaunch minimized |
+
+Patch IDs are `home-widgets` (淘江湖, 淘宝直播, 淘金币), `search-promotions` (search hot words and promo logo), and `main-menu` (帮我挑, 逛一逛, 采购宝). Use `all` explicitly to apply or restore all three. Apply/restore requires a target. Optional lower sidebar entries are managed through “全部”; the previous six-entry CSS patch is retired during migration. 88VIP, logistics, cart, recommendation-feed settings, and native navigation APIs are preserved.
+
+The home groups retain bundled styles and any existing overlays. Their shared new-home CSS loader correction stays enabled until both groups are restored. Each archive is composed from immutable original contents plus the enabled groups. Restoring all groups returns the original ASAR and CSS bytes or original absence. Gatekeeper and feature patches present in that baseline remain intact.
+
+On the new home page, the loader injects only the marked patch blocks, preserving the page's own theme. The widget patch hides each target's individual card wrapper too, avoiding empty tiles while retaining 88VIP. Search cleanup also hides the sponsored placeholder overlay; the input, search button, and separate desktop-search document remain intact. Repeating an operation with no installed-file changes does not restart the client.
+
+Original snapshots and the versioned registry are stored under `%APPDATA%\taobao\taobao-agent-declutter-backup`. Migration retains existing backups. Failed commits roll back; interrupted commits recover on the next mutation command. Unrelated archive/CSS changes or invalid backups stop installation. Status verifies installed files, not whether remote page selectors still match visually. Client updates may require a new compatible patch baseline; do not discard backups to bypass drift detection. The separate `npm run restore` remains a full vendor-archive rollback and is not an individual UI-group restore.
+
+Run `node scripts/test-declutter.js` for all eight combinations, independent transitions, migration, and recovery checks; add `--real` to rebuild and restore a disposable copy of the installed client.
 
 ---
 

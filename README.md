@@ -114,6 +114,7 @@ taobao-agent/
 ```bash
 git clone https://github.com/Schrodingers-Neko/taobao-agent.git
 cd taobao-agent
+npm install
 ```
 
 ### 2. 检查并应用 ASAR 补丁
@@ -164,6 +165,19 @@ npm run client:start
 | `npm run restore` | 安全回滚 | 将 `app.asar` 从备份无损还原回官方原始二进制文件 |
 | `npm run client:start` | 生命周期 | 通过 Windows Shell 启动客户端（窗口化且保持最小化） |
 | `npm run diff` | 审计对比 | 检查本地技能与 `%APPDATA%\taobao\` 上游热更之间的 Diff 变动 |
+| `npm run declutter:apply -- <patch-id>` | 应用界面精简 | 应用指定分组，保留其他分组，并最小化重启客户端 |
+| `npm run declutter:status` | 只读检查 | 检查各分组、备份、已安装文件哈希与恢复状态 |
+| `npm run declutter:restore -- <patch-id>` | 安全回滚 | 恢复指定分组，保留其他分组，并最小化重启客户端 |
+
+补丁分为 `home-widgets`（淘江湖、淘宝直播、淘金币）、`search-promotions`（搜索热词与促销标识）和 `main-menu`（帮我挑、逛一逛、采购宝）。使用 `all` 可明确应用或恢复全部三个分组；应用和恢复必须指定目标。下方可选入口通过“全部”菜单管理，迁移时移除此前六个入口的 CSS 隐藏补丁。保留 88VIP、物流、购物车、推荐流设置和原生导航接口。
+
+首页两个分组保留内置样式和原有覆盖文件，共用的新首页 CSS 加载修复仅在两个分组均恢复后移除。ASAR 始终由不可变原始内容和当前启用的分组组合生成；恢复全部分组后，ASAR 与 CSS 回到原始字节或原始不存在状态，保留基线已有的白名单绕过和工具解锁补丁。
+
+新首页只注入带标记的精简规则，保留页面自身的主题样式。首页组件补丁同时隐藏目标组件各自的卡片容器，避免留下空白卡片，并保留 88VIP。搜索精简同时隐藏推广占位层，保留输入框、搜索按钮和独立的桌面搜索文档。重复操作若未改变已安装文件，则不重启客户端。
+
+原始快照和版本化登记文件保存于 `%APPDATA%\taobao\taobao-agent-declutter-backup`。迁移保留已有备份。提交失败自动回滚，中断提交在下次修改命令时恢复。无关的 ASAR/CSS 变更或损坏的备份会阻止安装。状态检查仅验证已安装文件，不代表远程页面选择器的视觉效果已验证。客户端更新可能需要新的兼容基线，不应删除备份来绕过变更检测。独立的 `npm run restore` 仍为整个官方归档的恢复命令，不能用于单个界面分组恢复。
+
+运行 `node scripts/test-declutter.js` 可验证八种组合、独立切换、迁移与恢复流程；添加 `--real` 则对已安装客户端的临时副本验证重建与恢复。
 
 ---
 

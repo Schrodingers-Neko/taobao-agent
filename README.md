@@ -1,5 +1,34 @@
 # Taobao Agent (淘宝桌面版 MCP 助手)
 
+## 验证码叠加防护（captcha-guard）
+
+`captcha-guard` 是独立补丁，默认关闭。它从不可变 ASAR 基线重建主进程和两个 preload，统一普通 MTop 与流式请求的验证状态。首次安全验证只显示一个 iframe；验证期间暂停自动化和后台 MTop 请求，直接返回 `CAPTCHA_REQUIRED`，不排队、不重放。验证 iframe 自身的网络访问保持可用。
+
+```powershell
+npm run test:captcha                 # 无网络夹具、真实源代码锚点和语法检查
+npm run test:captcha -- --install    # 完整客户端的临时副本：安装、独立恢复、UI 补丁组合及回滚
+npm run captcha:status              # 只读检查补丁注册表、安装哈希及备份
+npm run captcha:apply               # 只启用验证码防护；已关闭的客户端保持关闭
+npm run captcha:restore             # 只恢复验证码防护，保留其他补丁
+npm run client:stop                 # 使用结束后关闭客户端及其子进程
+```
+
+安装前会验证唯一转换锚点、JavaScript 语法、ASAR 内容与完整性、现有门禁/功能签名，以及 CSS 和解包 sidecar 哈希。源代码不兼容或安装文件发生外部漂移时拒绝覆盖。注册表升级为 v5，并保留原始 v4 注册表；`declutter:apply all` / `declutter:restore all` 仍只操作四个 UI 分组。后续 UI 操作会从同一基线重新组合验证码防护。
+
+安装和恢复复用事务日志。写入失败时恢复完整的原有 ASAR、CSS 和注册表；进程中途退出后，再次运行同一命令会先恢复未完成事务。备份目录为 `%APPDATA%\taobao\taobao-agent-declutter-backup`，不要删除或手工改写其中的基线、哈希和 `manifest.json`。发现 `DRIFTED` 时先保留现场并检查客户端更新或其他补丁，不要强制覆盖。
+
+正在运行的客户端会受控重启，并通过 Windows Shell 在交互桌面中最小化启动；安装前已经关闭的客户端会保持关闭。未使用客户端时不要将其留在后台。补丁不会删除缓存、修改下载的 CDN 文件或更新 `skills/`。现有功能解锁、UI 补丁及 declutter observer 保留。
+
+MCP 工具发现（`tools/list`）和本地验证控制不会自动启动客户端，避免仅连接 MCP 就留下后台进程。客户端关闭时工具发现会返回连接错误；需要使用时先运行 `npm run client:start`，再刷新 MCP 工具连接。桥接器文件更新后，已有 MCP 连接需重新连接才能加载新逻辑。
+
+手动完成滑块后，状态变为 `verified_awaiting_confirmation`。用户明确回复“已完成验证”之前，代理不得恢复页面操作。`get_verification_status()` 只读取本地状态和计数；`resume_after_verification({ challengeId })` 仅在用户明确确认后调用，未完成或过期编号会被拒绝。关闭验证窗口仍保持暂停，使用“重新打开验证”按钮继续手动验证。验证参数仅保留在内存，绑定原始账号、API、版本和序列化请求数据，恢复后只供一个新发起的匹配请求使用。
+
+本地页面工具保留登录检查并跳过 `ABExperimentQuery`；云工具保留原有流程。相同登录状态和账号不会再次触发凭据预热。MTop 页面未就绪返回 `MTOP_NOT_READY`，不当作网络错误进行三次重试。网络凭据刷新失败后冷却 60 秒，没有定时重试；账号变化或可信页面重新就绪才重置冷却。
+
+测试夹具 `scripts/captcha/fixtures/mtop-2.4.16.txt` 来自本机已缓存的 SDK，只在隔离的假 DOM/传输环境中执行。测试不会调用淘宝 RPC 或外部网络。安装后需先由用户手动完成验证并确认，再执行少量只读操作及十分钟 CPU、内存和生命周期计数采样；验证再次出现时立即暂停。
+
+用户确认且本地协调器恢复为 `idle` 后，可运行 `node scripts/captcha/profile.js --manual-confirmed`。采样默认持续十分钟，每五秒记录进程 CPU、工作集、私有内存及本地生命周期计数到 `backup/captcha-investigation/profile-*.jsonl`；进程变化或 CPU 不可读取时不会用零值冒充可靠测量。验证出现或客户端退出时立即停止，不会自动启动客户端、确认验证或调用页面工具。使用结束后运行 `npm run client:stop`。
+
 <p align="center">
   <a href="README_EN.md">English</a> | <strong>简体中文</strong>
 </p>

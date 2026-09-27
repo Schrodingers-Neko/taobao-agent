@@ -1,9 +1,10 @@
 // Pure transformations: every output is composed from immutable original contents.
 const IDS = ['home-widgets', 'search-promotions', 'main-menu', 'toolbar'];
+const ALL_IDS = [...IDS, 'captcha-guard'];
 const HOME_FILES = ['tbhome.css', 'home.css'];
 const PREFIX = 'taobao-agent-declutter:v3:';
 const LEGACY_MARKER = 'taobao-agent-declutter:v1';
-const REVISION = 4;
+const REVISION = 5;
 const RULES = {
   'home-widgets': '[data-taobao-agent-home-widget],\n.business-entry-bbs-card,\n.business-entry-live-card,\n.client-tao-coin-wrapper {\n  display: none !important;\n}',
   // New home: the sponsored query/brand overlay has no input or button descendants.
@@ -11,10 +12,10 @@ const RULES = {
   'search-promotions': '[data-sg-type="hotWord"],\n.tbh-logo.tbh-logo-for-client,\n[class*=search] div[class*=placeholder] {\n  display: none !important;\n}',
 };
 const PRELOAD = 'out/preload/index.js';
-function empty() { return Object.fromEntries(IDS.map(id => [id, false])); }
+function empty() { return Object.fromEntries(ALL_IDS.map(id => [id, false])); }
 function targets(id) {
   if (id === 'all') return IDS;
-  if (!IDS.includes(id)) throw new Error('A patch target is required: ' + IDS.join(' | ') + ' | all');
+  if (!ALL_IDS.includes(id)) throw new Error('A patch target is required: ' + ALL_IDS.join(' | ') + ' | all');
   return [id];
 }
 function cssBlock(id) { return '\n\n/* ' + PREFIX + id + ' */\n' + RULES[id] + '\n'; }
@@ -73,4 +74,4 @@ function toolbar(source, enabled) {
   }
   return source;
 }
-module.exports = { IDS, HOME_FILES, PREFIX, LEGACY_MARKER, REVISION, PRELOAD, empty, targets, cssBlock, composeCss, preload, mainMenu, toolbar };
+module.exports = { IDS, ALL_IDS, HOME_FILES, PREFIX, LEGACY_MARKER, REVISION, PRELOAD, empty, targets, cssBlock, composeCss, preload, mainMenu, toolbar };

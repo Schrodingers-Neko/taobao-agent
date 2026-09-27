@@ -14,6 +14,11 @@
     "declutter:apply": "node scripts/declutter.js --apply",
     "declutter:status": "node scripts/declutter.js --status",
     "declutter:restore": "node scripts/declutter.js --restore",
+    "captcha:status": "node scripts/declutter.js --status",
+    "captcha:apply": "node scripts/declutter.js --apply captcha-guard",
+    "captcha:restore": "node scripts/declutter.js --restore captcha-guard",
+    "test:captcha": "node scripts/test-captcha.js",
+    "client:stop": "node scripts/client-stop.js",
     "client:start": "cmd /c start \"\" /min \"%LOCALAPPDATA%\\Programs\\taobao\\淘宝桌面版.exe\""
   },
   "keywords": [
@@ -26,5 +31,8 @@
   "license": "MIT",
   "dependencies": {
     "@electron/asar": "^3.4.1"
+  },
+  "devDependencies": {
+    "acorn": "^8.15.0"
   }
 }

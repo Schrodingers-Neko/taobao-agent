@@ -38,7 +38,7 @@ async function fixture(root) {
   return o;
 }
 function assertState(o, enabled) {
-  const m = readManifest(o); assert.deepEqual(m.enabled, enabled); assert.deepEqual(d.installedHashes(d.context(o)), m.expected);
+  const m = readManifest(o); assert.deepEqual(m.enabled, { ...p.empty(), ...enabled }); assert.deepEqual(d.installedHashes(d.context(o)), m.expected);
   const read = name => asar.extractFile(o.asarPath, path.join(...name.split('/'))).toString();
   const cssEnabled = enabled['home-widgets'] || enabled['search-promotions'];
   assert.equal(read(p.PRELOAD).includes(p.PREFIX + 'home-loader'), cssEnabled); new vm.Script(read(p.PRELOAD)); new vm.Script(read(MENU));
@@ -142,7 +142,7 @@ async function registryUpgrade(root) {
   assert.equal(interrupted.status, 99, interrupted.stderr); assert(readManifest(o).pending);
   await d.applyDeclutter('toolbar', o);
   const current = readManifest(o);
-  assert.equal(current.version, 4); assert.deepEqual(current.baseline, previous.baseline);
+  assert.equal(current.version, 5); assert.deepEqual(current.baseline, previous.baseline);
   assert(fs.existsSync(current.registryMigration));
   assert.deepEqual(d.installedHashes(ctx).css, installed.css);
   assertState(o, { ...p.empty(), 'main-menu': true, 'toolbar': true });

@@ -97,6 +97,7 @@ async function ensureAppRunning() {
     if (!exePath) {
       log('Executable not found, trying protocol handler taodesktop:// (minimized)');
       spawn('cmd.exe', ['/c', 'start', '""', '/min', 'taodesktop://'], {
+        windowsHide: true,
         detached: true,
         stdio: 'ignore',
         windowsVerbatimArguments: true,
@@ -104,6 +105,7 @@ async function ensureAppRunning() {
     } else {
       log('Launching Taobao Desktop (windowed & minimized) from:', exePath);
       spawn('cmd.exe', ['/c', 'start', '""', '/min', `"${exePath}"`], {
+        windowsHide: true,
         detached: true,
         stdio: 'ignore',
         windowsVerbatimArguments: true,
@@ -156,6 +158,7 @@ function callPipe(payload, timeoutMs = SOCKET_TIMEOUT_MS) {
     client.on('end', () => {
       if (!settled) {
         settled = true;
+        client.destroy();
         try {
           const parsed = JSON.parse(buffer.trim());
           resolve(parsed);
@@ -168,8 +171,12 @@ function callPipe(payload, timeoutMs = SOCKET_TIMEOUT_MS) {
     client.on('error', (err) => {
       if (!settled) {
         settled = true;
+        client.destroy();
         reject(err);
       }
+    });
+    client.on('close', () => {
+      if (!settled) { settled = true; reject(new Error('Taobao pipe closed before returning a response.')); }
     });
   });
 }
@@ -177,20 +184,34 @@ function callPipe(payload, timeoutMs = SOCKET_TIMEOUT_MS) {
 /**
  * Execute RPC call with auto-launch retry.
  */
-async function rpcWithRetry(payload) {
+async function rpcWithRetry(payload, { call = callPipe, launch = ensureAppRunning } = {}) {
   try {
-    return await callPipe(payload);
+    return await call(payload);
   } catch (err) {
+    // Discovery and local verification controls never start an unused client.
+    if (['_help', 'get_verification_status', 'resume_after_verification'].includes(payload?.tool)) throw err;
     if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED') {
       log('Connection failed, attempting to launch Taobao Desktop...');
-      await ensureAppRunning();
-      return await callPipe(payload);
+      await launch();
+      return await call(payload);
     }
     throw err;
   }
 }
 
+function serializeToolError(error) {
+  return typeof error === 'string' ? error : JSON.stringify(error);
+}
+function nativeToolError(response) {
+  if (response.error) return response.error;
+  const resultError = response.result?.error;
+  if (resultError?.code && resultError.retryable === false) return resultError;
+  if (response.result?.code && response.result.retryable === false) return response.result;
+  return null;
+}
+
 // Stdio JSON-RPC 2.0 loop
+function startBridge() {
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -310,13 +331,14 @@ rl.on('line', async (line) => {
     try {
       const resp = await rpcWithRetry({ tool: toolName, arguments: args });
 
-      if (resp.error) {
+      const toolError = nativeToolError(resp);
+      if (toolError) {
         process.stdout.write(
           JSON.stringify({
             jsonrpc: '2.0',
             id,
             result: {
-              content: [{ type: 'text', text: String(resp.error) }],
+              content: [{ type: 'text', text: serializeToolError(toolError) }],
               isError: true,
             },
           }) + '\n'
@@ -376,3 +398,6 @@ try {
 } catch (err) {
   log('Startup skill check warning:', err.message);
 }
+}
+if (require.main === module) startBridge();
+module.exports = { callPipe, rpcWithRetry, serializeToolError, nativeToolError, startBridge };

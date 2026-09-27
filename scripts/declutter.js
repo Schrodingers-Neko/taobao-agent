@@ -13,6 +13,7 @@ const asar = require('@electron/asar');
 const patchAsar = require('./patch-asar');
 
 const patches = require('./declutter-patches');
+const captcha = require('./captcha/transforms');
 const { HOME_FILES } = patches;
 const APP_NAME = '淘宝桌面版.exe';
 
@@ -105,12 +106,12 @@ function validateSnapshot(ctx, snapshot) {
 function loadManifest(ctx) {
   if (!fs.existsSync(ctx.manifestPath)) return null;
   const manifest = JSON.parse(fs.readFileSync(ctx.manifestPath, 'utf8'));
-  if (![2, 3, 4].includes(manifest.version) || manifest.archivePath !== ctx.archive || manifest.cssDir !== ctx.cssDir) {
+  if (![2, 3, 4, 5].includes(manifest.version) || manifest.archivePath !== ctx.archive || manifest.cssDir !== ctx.cssDir) {
     throw new Error('Backup manifest does not match this installation.');
   }
   validateSnapshot(ctx, manifest.baseline);
   if (manifest.pending) validateSnapshot(ctx, manifest.pending.snapshot);
-  const required = manifest.version === 3 ? patches.IDS.filter(id => id !== 'toolbar') : patches.IDS;
+  const required = manifest.version === 3 ? patches.IDS.filter(id => id !== 'toolbar') : manifest.version===5?patches.ALL_IDS:patches.IDS;
   if (manifest.version >= 3 && (required.some(id => typeof manifest.enabled?.[id] !== 'boolean') ||
       !manifest.expected?.archive || !manifest.expected.css || !manifest.sidecars)) {
     throw new Error('Invalid independent patch registry.');
@@ -273,11 +274,16 @@ function desiredFiles(ctx, manifest, enabled) {
   const baseline = manifest.baseline.archive.file;
   freshArchive(baseline);
   const menu = rendererPath(baseline);
-  return {
+  const result = {
     [patches.PRELOAD]: patches.preload(extract(baseline, patches.PRELOAD), enabled),
     [menu]: patches.toolbar(patches.mainMenu(extract(baseline, menu), enabled), enabled),
     [sidebarPath(baseline).split(path.sep).join('/')]: extract(baseline, sidebarPath(baseline).split(path.sep).join('/')),
   };
+  if(enabled['captcha-guard'] || manifest.enabled?.['captcha-guard']) {
+    for(const relative of captcha.FILES) if(relative!==patches.PRELOAD) result[relative]=extract(baseline,relative);
+    if(enabled['captcha-guard'])Object.assign(result,captcha.compose(result));
+  }
+  return result;
 }
 function desiredCss(ctx, manifest, enabled) {
   const baseline = manifest.baseline.archive.file;
@@ -350,13 +356,13 @@ function legacyCss(ctx, manifest, filename) {
   return Buffer.from(base + '\n\n/* ' + patches.LEGACY_MARKER + ' */\n' + rules + '\n');
 }
 function initializeRegistry(ctx, previous) {
-  if (previous?.version === 3) {
+  if (previous?.version === 3 || previous?.version === 4) {
     verifySnapshot(previous.baseline);
     verifySidecars(ctx, previous);
     verifyInstalled(ctx, previous.expected);
-    const registryMigration = path.join(ctx.backupDir, 'registry-v3-' + crypto.randomUUID() + '.json');
+    const registryMigration = path.join(ctx.backupDir, 'registry-v'+previous.version+'-' + crypto.randomUUID() + '.json');
     fs.writeFileSync(registryMigration, JSON.stringify(previous, null, 2) + '\n', { flag: 'wx' });
-    return { ...previous, version: 4, enabled: { ...previous.enabled, 'toolbar': false }, registryMigration };
+    return { ...previous, version: 5, enabled: { ...patches.empty(), ...previous.enabled, 'captcha-guard': false }, registryMigration };
   }
   if (previous) {
     verifySnapshot(previous.baseline);
@@ -373,7 +379,7 @@ function initializeRegistry(ctx, previous) {
     const enabled = patches.empty();
     if (previous.state === 'applied') enabled['home-widgets'] = enabled['search-promotions'] = true;
     return {
-      version: 4, archivePath: ctx.archive, cssDir: ctx.cssDir, state: previous.state,
+      version: 5, archivePath: ctx.archive, cssDir: ctx.cssDir, state: previous.state,
       baseline: previous.baseline, originalPatches: previous.originalPatches,
       enabled, expected: current, sidecars: sidecarHashes(ctx, previous.baseline.archive.file), migration,
     };
@@ -392,7 +398,7 @@ function initializeRegistry(ctx, previous) {
   }
   const baseline = capture(ctx, 'baseline-');
   return {
-    version: 4, archivePath: ctx.archive, cssDir: ctx.cssDir, state: 'restored',
+    version: 5, archivePath: ctx.archive, cssDir: ctx.cssDir, state: 'restored',
     baseline, originalPatches: patchStates(ctx.archive), enabled: patches.empty(),
     expected: installedHashes(ctx), sidecars: sidecarHashes(ctx, baseline.archive.file),
   };
@@ -466,9 +472,13 @@ async function withLock(ctx, operation) {
   const fd = fs.openSync(ctx.lockPath, 'wx');
   fs.writeFileSync(fd, JSON.stringify({ pid: process.pid }));
   fs.closeSync(fd);
+  // Remember the state before the potentially long archive build. A discovery
+  // connection must not turn a previously closed client into a requested restart.
+  const restartAfter = ctx.restart && appRunning();
   let stopped = false;
   async function stop() {
     if (ctx.restart && !stopped) {
+      // Preserve the user's lifecycle: an already closed client stays closed.
       stopped = true;
       await stopClient();
     }
@@ -482,19 +492,25 @@ async function withLock(ctx, operation) {
     return await operation(manifest, stop);
   } finally {
     fs.unlinkSync(ctx.lockPath);
-    if (stopped) await launchClient();
+    if (stopped && restartAfter) await launchClient();
   }
 }
 async function changePatches(target, applying, options = {}) {
   const selected = patches.targets(target); // Validate before touching files or the client.
   const ctx = context(options);
+  const preflight = loadManifest(ctx);
+  if ((applying && selected.includes('captcha-guard')) || preflight?.enabled?.['captcha-guard']) {
+    const baseline=preflight?.baseline.archive.file||ctx.archive;
+    if(preflight)verifySnapshot(preflight.baseline);
+    captcha.compose(Object.fromEntries(captcha.FILES.map(p=>[p,extract(baseline,p)])));
+  }
   return withLock(ctx, async (previous, stop) => {
     if (!previous && !applying) {
       console.log('[declutter] No UI patches to restore.');
       return;
     }
-    const migrating = previous && previous.version !== 4;
-    let manifest = previous?.version === 4 ? previous : initializeRegistry(ctx, previous);
+    const migrating = previous && previous.version !== 5;
+    let manifest = previous?.version === 5 ? previous : initializeRegistry(ctx, previous);
     verifySnapshot(manifest.baseline);
     verifySidecars(ctx, manifest);
     verifyInstalled(ctx, manifest.expected);
@@ -581,7 +597,7 @@ function showStatus(options = {}) {
     catch (_) { contents = 'DRIFTED'; }
   }
   console.log('--- Taobao Desktop UI Patch Status ---');
-  for (const id of patches.IDS) console.log(id.padEnd(22), ':', manifest?.version === 2 ? 'LEGACY (migration required)' :
+  for (const id of patches.ALL_IDS) console.log(id.padEnd(22), ':', manifest?.version === 2 ? 'LEGACY (migration required)' :
     manifest?.enabled?.[id] ? contents === 'VERIFIED' ? 'APPLIED' : 'APPLIED / DRIFTED' : 'NOT APPLIED');
   console.log('Original snapshots     :', health);
   console.log('Installed contents     :', contents);
@@ -599,4 +615,4 @@ async function main() {
 if (require.main === module) {
   main().catch(error => { console.error('[declutter ERROR]', error.stack || error); process.exitCode = 1; });
 }
-module.exports = { applyDeclutter, restoreDeclutter, showStatus, verifyRebuild, installedHashes, context, desiredFiles, desiredCss, patches };
+module.exports = { applyDeclutter, restoreDeclutter, showStatus, verifyRebuild, installedHashes, context, desiredFiles, desiredCss, patches, stopClient };

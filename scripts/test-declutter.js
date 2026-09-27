@@ -5,7 +5,11 @@ const { spawnSync } = require('child_process');
 const asar = require('@electron/asar');
 const d = require('./declutter'), p = d.patches;
 const PRELOAD = 'class Base{async injectEarlyCSS(){let t="";const n=document.createElement("style");n.textContent=t,document.head.appendChild(n)}handleContextMenu(){}}';
-const MENU_SOURCE = 'const view={children:T.map(e=>s.jsx(S,{title:e.name,placement:"right",disabled:!0,children:e},e.icon))};';
+const MENU_SOURCE = 'const view={children:T.map(e=>s.jsx(S,{title:e.name,placement:"right",disabled:!0,children:e},e.icon))};' +
+  'const top=[s.jsxs("div",{className:"weather-today",children:"weather"}),' +
+  's.jsx(S,{id:"pets-tooltip",children:"panda"}),' +
+  '(()=>{let e=J.get("shortcutList.screenshot.value");return s.jsx(S,{id:"shots",children:"screenshot"})})(),' +
+  '{children:"history"},{children:"settings"},{children:"more"},{children:"profile"},{children:"window-controls"}];';
 const SIDEBAR = 'out/renderer/assets/css/browserLikeWindow-fixture.css';
 const MENU = 'out/renderer/assets/js/pages/browserLikeWindow-fixture.js';
 const OVERLAY = '.custom{font-size:17px}\n/* original overlay */';
@@ -39,8 +43,12 @@ function assertState(o, enabled) {
   const cssEnabled = enabled['home-widgets'] || enabled['search-promotions'];
   assert.equal(read(p.PRELOAD).includes(p.PREFIX + 'home-loader'), cssEnabled); new vm.Script(read(p.PRELOAD)); new vm.Script(read(MENU));
   const items = ['home', 'ai', 'message', 'cart', 'order', 'iguang', 'caigoubao'].map(icon => ({ icon, name: icon }));
-  const visible = vm.runInNewContext(read(MENU) + ';view.children.map(x=>x.children.icon)', { T: items, S: {}, s: { jsx: (_, props) => props } });
+  const globals = { T: items, S: {}, s: { jsx: (_, props) => props, jsxs: (_, props) => props }, J: { get: () => 'Ctrl+Shift+A' } };
+  const visible = vm.runInNewContext(read(MENU) + ';view.children.map(x=>x.children.icon)', { ...globals });
   assert.deepEqual([...visible], enabled['main-menu'] ? ['home', 'message', 'cart', 'order'] : items.map(x => x.icon));
+  const top = vm.runInNewContext(read(MENU) + ';top.filter(Boolean).map(x=>x.children)', { ...globals });
+  const essential = ['history', 'settings', 'more', 'profile', 'window-controls'];
+  assert.deepEqual([...top], enabled['toolbar'] ? essential : ['weather', 'panda', 'screenshot', ...essential]);
   assert.equal(read(SIDEBAR), '.menu-item{color:black}');
   for (const name of p.HOME_FILES) {
     const file = overlay(o, name);
@@ -82,14 +90,15 @@ async function loader() {
   assert.equal(marked.length, 3); observer(); assert.equal(marked.length, 6);
   assert(marked.every(args => args[0] === 'data-taobao-agent-home-widget'));
   assert.throws(() => p.mainMenu('unknown', { ...p.empty(), 'main-menu': true }), /Unsupported client/);
+  assert.throws(() => p.toolbar('unknown', { ...p.empty(), 'toolbar': true }), /Unsupported client/);
 }
 async function combinations(root) {
   const o = await fixture(root), ctx = d.context(o), original = d.installedHashes(ctx);
   const noTarget = spawnSync(process.execPath, [path.join(__dirname, 'declutter.js'), '--apply'], { encoding: 'utf8' });
   assert.equal(noTarget.status, 1); assert.match(noTarget.stderr, /target is required/); assert.deepEqual(d.installedHashes(ctx), original);
-  for (let mask = 0; mask < 8; mask++) {
+  for (let mask = 0; mask < (1 << p.IDS.length); mask++) {
     await d.restoreDeclutter('all', o); const enabled = p.empty();
-    for (let i = 0; i < 3; i++) if (mask & (1 << i)) { enabled[p.IDS[i]] = true; await d.applyDeclutter(p.IDS[i], o); }
+    for (let i = 0; i < p.IDS.length; i++) if (mask & (1 << i)) { enabled[p.IDS[i]] = true; await d.applyDeclutter(p.IDS[i], o); }
     if (!fs.existsSync(ctx.manifestPath)) { await d.applyDeclutter('home-widgets', o); await d.restoreDeclutter('home-widgets', o); }
     assertState(o, enabled);
     for (const id of p.IDS) {
@@ -118,7 +127,29 @@ async function combinations(root) {
   assert.deepEqual(d.installedHashes(ctx), original); fs.writeFileSync(backup, originalBackup);
   fs.appendFileSync(overlay(o, 'home.css'), '\n.external{}'); await assert.rejects(d.applyDeclutter('all', o), /outside declutter/);
   fs.writeFileSync(overlay(o, 'home.css'), OVERLAY); fs.appendFileSync(o.asarPath, 'external'); await assert.rejects(d.applyDeclutter('all', o), /outside declutter/);
-  console.log('PASS: eight combinations, independent transitions, no-op operations, exact restore, rollback, interrupted recovery, and drift rejection.');
+  console.log('PASS: sixteen combinations, independent transitions, no-op operations, exact restore, rollback, interrupted recovery, and drift rejection.');
+}
+async function registryUpgrade(root) {
+  const o = await fixture(root), ctx = d.context(o);
+  await d.applyDeclutter('main-menu', o);
+  const previous = readManifest(o); previous.version = 3; previous.patchRevision = 3; delete previous.enabled['toolbar'];
+  fs.writeFileSync(ctx.manifestPath, JSON.stringify(previous));
+  const installed = d.installedHashes(ctx);
+  await assert.rejects(d.applyDeclutter('toolbar', { ...o, hooks: { afterArchiveWrite() { throw Error('Registry upgrade failure'); } } }), /Registry upgrade failure/);
+  assert.deepEqual(readManifest(o), previous); assert.deepEqual(d.installedHashes(ctx), installed);
+  const child = 'const d=require(' + JSON.stringify(path.join(__dirname, 'declutter.js')) + ');d.applyDeclutter("toolbar",{...JSON.parse(process.argv[1]),hooks:{afterArchiveWrite(){process.exit(99)}}}).catch(e=>{console.error(e);process.exit(1)})';
+  const interrupted = spawnSync(process.execPath, ['-e', child, JSON.stringify(o)], { encoding: 'utf8' });
+  assert.equal(interrupted.status, 99, interrupted.stderr); assert(readManifest(o).pending);
+  await d.applyDeclutter('toolbar', o);
+  const current = readManifest(o);
+  assert.equal(current.version, 4); assert.deepEqual(current.baseline, previous.baseline);
+  assert(fs.existsSync(current.registryMigration));
+  assert.deepEqual(d.installedHashes(ctx).css, installed.css);
+  assertState(o, { ...p.empty(), 'main-menu': true, 'toolbar': true });
+  await d.restoreDeclutter('toolbar', o);
+  assert.deepEqual(d.installedHashes(ctx), installed);
+  assertState(o, { ...p.empty(), 'main-menu': true });
+  console.log('PASS: three-group registry upgrade, failed/interrupted upgrade recovery, and independent toolbar restore.');
 }
 async function migration(root) {
   const o = await fixture(root), ctx = d.context(o), original = d.installedHashes(ctx);
@@ -144,7 +175,7 @@ async function migration(root) {
   await d.restoreDeclutter('all', o); assert.deepEqual(d.installedHashes(ctx), original);
   console.log('PASS: legacy migration, failed/interrupted migration recovery, retired sidebar CSS, and retained originals.');
 }
-async function copiedClient(root, smoke = false) {
+async function copiedClient(root, smoke = false, toolbarOnly = false) {
   const live = d.context(), originalManifest = readManifest({ userDataDir: live.userData }); fs.mkdirSync(root, { recursive: true });
   const o = { asarPath: path.join(root, 'app.asar'), userDataDir: path.join(root, 'user-data'), restart: false }, ctx = d.context(o);
   const dir = path.join(ctx.backupDir, 'baseline-copy'); fs.mkdirSync(dir, { recursive: true });
@@ -154,14 +185,25 @@ async function copiedClient(root, smoke = false) {
   for (const r of m.baseline.css) if (r.existed) { const old = r.file; r.file = path.join(dir, r.filename + '.bak'); fs.copyFileSync(old, r.file); }
   fs.mkdirSync(ctx.cssDir, { recursive: true });
   for (const n of p.HOME_FILES) if (fs.existsSync(path.join(live.cssDir, n))) fs.copyFileSync(path.join(live.cssDir, n), path.join(ctx.cssDir, n));
-  fs.writeFileSync(ctx.manifestPath, JSON.stringify(m)); await d.applyDeclutter('all', o);
+  fs.writeFileSync(ctx.manifestPath, JSON.stringify(m));
+  if (toolbarOnly) {
+    const original = d.installedHashes(ctx);
+    await d.applyDeclutter('toolbar', o);
+    assert.deepEqual(d.installedHashes(ctx).css, original.css);
+    assert.deepEqual(readManifest(o).baseline, m.baseline);
+    await d.restoreDeclutter('toolbar', o);
+    assert.deepEqual(d.installedHashes(ctx), original);
+    console.log('PASS: toolbar apply/restore on a full disposable client, exact previous archive, CSS and other groups preserved.');
+    return;
+  }
+  await d.applyDeclutter('all', o);
   if (smoke) {
     await d.restoreDeclutter('all', o);
     assert.equal(d.installedHashes(ctx).archive, m.baseline.archive.hash);
     console.log('PASS: revised loader on a full disposable client copy and exact restoration.');
     return;
   }
-  for (const id of ['main-menu', 'home-widgets', 'search-promotions']) await d.restoreDeclutter(id, o);
+  for (const id of ['toolbar', 'main-menu', 'home-widgets', 'search-promotions']) await d.restoreDeclutter(id, o);
   assert.equal(d.installedHashes(ctx).archive, m.baseline.archive.hash); assert.equal(fs.existsSync(overlay(o, 'home.css')), false);
   await d.applyDeclutter('main-menu', o); await d.applyDeclutter('search-promotions', o); await d.restoreDeclutter('main-menu', o); await d.restoreDeclutter('search-promotions', o);
   assert.equal(d.installedHashes(ctx).archive, m.baseline.archive.hash);
@@ -169,6 +211,6 @@ async function copiedClient(root, smoke = false) {
 }
 (async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'taobao-declutter-check-'));
-  try { await loader(); await combinations(path.join(root, 'combinations')); await migration(path.join(root, 'migration')); if (process.argv.includes('--real') || process.argv.includes('--real-smoke')) await copiedClient(path.join(root, 'real'), process.argv.includes('--real-smoke')); }
+  try { await loader(); await combinations(path.join(root, 'combinations')); await migration(path.join(root, 'migration')); await registryUpgrade(path.join(root, 'upgrade')); if (process.argv.includes('--real') || process.argv.includes('--real-smoke') || process.argv.includes('--real-toolbar')) await copiedClient(path.join(root, 'real'), process.argv.includes('--real-smoke'), process.argv.includes('--real-toolbar')); }
   finally { if (path.dirname(path.resolve(root)) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('taobao-declutter-check-')) throw Error('Unsafe cleanup'); asar.uncacheAll(); fs.rmSync(root, { recursive: true, force: true }); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

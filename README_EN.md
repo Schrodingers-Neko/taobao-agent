@@ -170,7 +170,9 @@ Add the bridge to your MCP client configuration (e.g. Claude Desktop, Antigravit
 | `npm run declutter:status` | Read-only | Check each group, backups, installed hashes, and recovery state |
 | `npm run declutter:restore -- <patch-id>` | Rollback | Restore one group, preserving the other groups; relaunch minimized |
 
-Patch IDs are `home-widgets` (淘江湖, 淘宝直播, 淘金币), `search-promotions` (search hot words and promo logo), and `main-menu` (帮我挑, 逛一逛, 采购宝). Use `all` explicitly to apply or restore all three. Apply/restore requires a target. Optional lower sidebar entries are managed through “全部”; the previous six-entry CSS patch is retired during migration. 88VIP, logistics, cart, recommendation-feed settings, and native navigation APIs are preserved.
+Patch IDs are `home-widgets` (淘江湖, 淘宝直播, 淘金币), `search-promotions` (search hot words and promo logo), `main-menu` (帮我挑, 逛一逛, 采购宝), and `toolbar` (weather, desktop panda, screenshot button). Use `all` explicitly to apply or restore all four. Apply/restore requires a target. Optional lower sidebar entries are managed through “全部”; the previous six-entry CSS patch is retired during migration. 88VIP, logistics, cart, recommendation-feed settings, and native navigation APIs are preserved.
+
+Use `npm run declutter:apply -- toolbar` or `npm run declutter:restore -- toolbar` to hide or restore those three toolbar controls together. History, settings, more, profile, and window controls stay available, along with the existing screenshot shortcut. Existing three-group registries upgrade automatically while retaining their enabled states and original backups.
 
 The home groups retain bundled styles and any existing overlays. Their shared new-home CSS loader correction stays enabled until both groups are restored. Each archive is composed from immutable original contents plus the enabled groups. Restoring all groups returns the original ASAR and CSS bytes or original absence. Gatekeeper and feature patches present in that baseline remain intact.
 
@@ -178,7 +180,7 @@ On the new home page, the loader injects only the marked patch blocks, preservin
 
 Original snapshots and the versioned registry are stored under `%APPDATA%\taobao\taobao-agent-declutter-backup`. Migration retains existing backups. Failed commits roll back; interrupted commits recover on the next mutation command. Unrelated archive/CSS changes or invalid backups stop installation. Status verifies installed files, not whether remote page selectors still match visually. Client updates may require a new compatible patch baseline; do not discard backups to bypass drift detection. The separate `npm run restore` remains a full vendor-archive rollback and is not an individual UI-group restore.
 
-Run `node scripts/test-declutter.js` for all eight combinations, independent transitions, migration, and recovery checks; add `--real` to rebuild and restore a disposable copy of the installed client.
+Run `node scripts/test-declutter.js` for all sixteen combinations, independent transitions, migration, and recovery checks; add `--real` to rebuild and restore a disposable copy of the installed client. Use `--real-toolbar` for a focused full-client toolbar apply/restore check that verifies the other groups and CSS are preserved.
 
 ---
 

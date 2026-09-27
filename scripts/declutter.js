@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Independently reversible home, search, and main-menu patches for Taobao Desktop.
+ * Independently reversible home, search, main-menu, and toolbar patches.
  * Original snapshots remain immutable; a journal recovers interrupted commits.
  */
 const fs = require('fs');
@@ -105,12 +105,13 @@ function validateSnapshot(ctx, snapshot) {
 function loadManifest(ctx) {
   if (!fs.existsSync(ctx.manifestPath)) return null;
   const manifest = JSON.parse(fs.readFileSync(ctx.manifestPath, 'utf8'));
-  if (![2, 3].includes(manifest.version) || manifest.archivePath !== ctx.archive || manifest.cssDir !== ctx.cssDir) {
+  if (![2, 3, 4].includes(manifest.version) || manifest.archivePath !== ctx.archive || manifest.cssDir !== ctx.cssDir) {
     throw new Error('Backup manifest does not match this installation.');
   }
   validateSnapshot(ctx, manifest.baseline);
   if (manifest.pending) validateSnapshot(ctx, manifest.pending.snapshot);
-  if (manifest.version === 3 && (patches.IDS.some(id => typeof manifest.enabled?.[id] !== 'boolean') ||
+  const required = manifest.version === 3 ? patches.IDS.filter(id => id !== 'toolbar') : patches.IDS;
+  if (manifest.version >= 3 && (required.some(id => typeof manifest.enabled?.[id] !== 'boolean') ||
       !manifest.expected?.archive || !manifest.expected.css || !manifest.sidecars)) {
     throw new Error('Invalid independent patch registry.');
   }
@@ -274,7 +275,7 @@ function desiredFiles(ctx, manifest, enabled) {
   const menu = rendererPath(baseline);
   return {
     [patches.PRELOAD]: patches.preload(extract(baseline, patches.PRELOAD), enabled),
-    [menu]: patches.mainMenu(extract(baseline, menu), enabled),
+    [menu]: patches.toolbar(patches.mainMenu(extract(baseline, menu), enabled), enabled),
     [sidebarPath(baseline).split(path.sep).join('/')]: extract(baseline, sidebarPath(baseline).split(path.sep).join('/')),
   };
 }
@@ -349,6 +350,14 @@ function legacyCss(ctx, manifest, filename) {
   return Buffer.from(base + '\n\n/* ' + patches.LEGACY_MARKER + ' */\n' + rules + '\n');
 }
 function initializeRegistry(ctx, previous) {
+  if (previous?.version === 3) {
+    verifySnapshot(previous.baseline);
+    verifySidecars(ctx, previous);
+    verifyInstalled(ctx, previous.expected);
+    const registryMigration = path.join(ctx.backupDir, 'registry-v3-' + crypto.randomUUID() + '.json');
+    fs.writeFileSync(registryMigration, JSON.stringify(previous, null, 2) + '\n', { flag: 'wx' });
+    return { ...previous, version: 4, enabled: { ...previous.enabled, 'toolbar': false }, registryMigration };
+  }
   if (previous) {
     verifySnapshot(previous.baseline);
     const current = installedHashes(ctx);
@@ -364,7 +373,7 @@ function initializeRegistry(ctx, previous) {
     const enabled = patches.empty();
     if (previous.state === 'applied') enabled['home-widgets'] = enabled['search-promotions'] = true;
     return {
-      version: 3, archivePath: ctx.archive, cssDir: ctx.cssDir, state: previous.state,
+      version: 4, archivePath: ctx.archive, cssDir: ctx.cssDir, state: previous.state,
       baseline: previous.baseline, originalPatches: previous.originalPatches,
       enabled, expected: current, sidecars: sidecarHashes(ctx, previous.baseline.archive.file), migration,
     };
@@ -383,7 +392,7 @@ function initializeRegistry(ctx, previous) {
   }
   const baseline = capture(ctx, 'baseline-');
   return {
-    version: 3, archivePath: ctx.archive, cssDir: ctx.cssDir, state: 'restored',
+    version: 4, archivePath: ctx.archive, cssDir: ctx.cssDir, state: 'restored',
     baseline, originalPatches: patchStates(ctx.archive), enabled: patches.empty(),
     expected: installedHashes(ctx), sidecars: sidecarHashes(ctx, baseline.archive.file),
   };
@@ -484,8 +493,8 @@ async function changePatches(target, applying, options = {}) {
       console.log('[declutter] No UI patches to restore.');
       return;
     }
-    const migrating = previous?.version === 2;
-    let manifest = previous?.version === 3 ? previous : initializeRegistry(ctx, previous);
+    const migrating = previous && previous.version !== 4;
+    let manifest = previous?.version === 4 ? previous : initializeRegistry(ctx, previous);
     verifySnapshot(manifest.baseline);
     verifySidecars(ctx, manifest);
     verifyInstalled(ctx, manifest.expected);
@@ -525,7 +534,7 @@ async function changePatches(target, applying, options = {}) {
         for (const filename of HOME_FILES) {
           const file = path.join(ctx.cssDir, filename);
           if (css[filename] === null) { if (fs.existsSync(file)) fs.unlinkSync(file); }
-          else writeAtomic(file, css[filename]);
+          else if (!fs.existsSync(file) || hashFile(file) !== expected.css[filename]) writeAtomic(file, css[filename]);
           if (ctx.hooks.afterCssWrite) ctx.hooks.afterCssWrite(filename);
         }
         verifyInstalled(ctx, expected);
@@ -567,13 +576,13 @@ function showStatus(options = {}) {
     catch (_) { health = 'INVALID'; }
   }
   let contents = 'UNMANAGED';
-  if (manifest?.version === 3) {
+  if (manifest?.version >= 3) {
     try { verifyInstalled(ctx, manifest.expected); verifySidecars(ctx, manifest); contents = 'VERIFIED'; }
     catch (_) { contents = 'DRIFTED'; }
   }
   console.log('--- Taobao Desktop UI Patch Status ---');
   for (const id of patches.IDS) console.log(id.padEnd(22), ':', manifest?.version === 2 ? 'LEGACY (migration required)' :
-    manifest?.enabled[id] ? contents === 'VERIFIED' ? 'APPLIED' : 'APPLIED / DRIFTED' : 'NOT APPLIED');
+    manifest?.enabled?.[id] ? contents === 'VERIFIED' ? 'APPLIED' : 'APPLIED / DRIFTED' : 'NOT APPLIED');
   console.log('Original snapshots     :', health);
   console.log('Installed contents     :', contents);
   console.log('Transaction recovery   :', manifest?.pending ? 'REQUIRED' : 'NONE');

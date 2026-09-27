@@ -1,9 +1,9 @@
 // Pure transformations: every output is composed from immutable original contents.
-const IDS = ['home-widgets', 'search-promotions', 'main-menu'];
+const IDS = ['home-widgets', 'search-promotions', 'main-menu', 'toolbar'];
 const HOME_FILES = ['tbhome.css', 'home.css'];
 const PREFIX = 'taobao-agent-declutter:v3:';
 const LEGACY_MARKER = 'taobao-agent-declutter:v1';
-const REVISION = 3;
+const REVISION = 4;
 const RULES = {
   'home-widgets': '[data-taobao-agent-home-widget],\n.business-entry-bbs-card,\n.business-entry-live-card,\n.client-tao-coin-wrapper {\n  display: none !important;\n}',
   // New home: the sponsored query/brand overlay has no input or button descendants.
@@ -60,4 +60,17 @@ function mainMenu(source, enabled) {
     '/* ' + PREFIX + 'main-menu */.map(e=>s.jsx(S,{title:e.name,placement:"right",disabled:!0,';
   return replaceOnce(source, anchor, replacement, 'main-menu render');
 }
-module.exports = { IDS, HOME_FILES, PREFIX, LEGACY_MARKER, REVISION, PRELOAD, empty, targets, cssBlock, composeCss, preload, mainMenu };
+function toolbar(source, enabled) {
+  if (!enabled['toolbar']) return source;
+  // Suppress complete renderer expressions so no empty buttons or hover areas remain.
+  const anchors = {
+    weather: 's.jsxs("div",{className:"weather-today",',
+    panda: 's.jsx(S,{id:"pets-tooltip",',
+    screenshot: '(()=>{let e=J.get("shortcutList.screenshot.value");',
+  };
+  for (const [name, anchor] of Object.entries(anchors)) {
+    source = replaceOnce(source, anchor, '/* ' + PREFIX + 'toolbar:' + name + ' */false&&' + anchor, 'toolbar ' + name);
+  }
+  return source;
+}
+module.exports = { IDS, HOME_FILES, PREFIX, LEGACY_MARKER, REVISION, PRELOAD, empty, targets, cssBlock, composeCss, preload, mainMenu, toolbar };
